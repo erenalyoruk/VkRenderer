@@ -3,6 +3,7 @@
 #include <cassert>
 #include <span>
 #include <stdexcept>
+#include <vector>
 
 #include "logger.hpp"
 
@@ -39,6 +40,25 @@ Window::~Window() {
 
   SDL_Quit();
   LOG_DEBUG("SDL terminated.");
+}
+
+Window::Window(Window&& other) noexcept
+    : window_{std::exchange(other.window_, nullptr)},
+      width_{std::exchange(other.width_, 0)},
+      height_{std::exchange(other.height_, 0)},
+      shouldClose_{std::exchange(other.shouldClose_, false)} {}
+
+Window& Window::operator=(Window&& other) noexcept {
+  if (this == &other) {
+    return *this;
+  }
+
+  window_ = std::exchange(other.window_, nullptr);
+  width_ = std::exchange(other.width_, 0);
+  height_ = std::exchange(other.height_, 0);
+  shouldClose_ = std::exchange(other.shouldClose_, false);
+
+  return *this;
 }
 
 void Window::PollEvents() {

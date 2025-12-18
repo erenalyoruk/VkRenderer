@@ -1,6 +1,7 @@
 
 #include <vulkan/vulkan.hpp>
 
+#include "gpu/instance.hpp"
 #include "logger.hpp"
 #include "window.hpp"
 
@@ -18,6 +19,9 @@ int main() {
   );
 
   Window window{1280, 720, "Vulkan Window"};
+
+  gpu::Instance instance{"Vulkan Renderer",
+                         window.GetRequiredVulkanExtensions()};
 
   while (!window.ShouldClose()) {
     window.PollEvents();

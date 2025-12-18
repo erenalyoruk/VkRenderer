@@ -27,7 +27,7 @@ class Window {
   [[nodiscard]] bool CreateSurface(VkInstance instance,
                                    VkSurfaceKHR* surface) const;
 
-  [[nodiscard]] SDL_Window& GetSDLWindow() const { return *window_; }
+  [[nodiscard]] SDL_Window& GetHandle() const { return *window_; }
 
   [[nodiscard]] bool ShouldClose() const { return shouldClose_; }
 

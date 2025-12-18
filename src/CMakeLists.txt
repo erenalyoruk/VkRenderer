@@ -4,3 +4,5 @@ target_sources(
     "main.cpp"
     "window.cpp"
 )
+
+add_subdirectory("gpu")
