@@ -11,10 +11,12 @@ Checks: >
   clang-analyzer-*,
 
   -modernize-use-trailing-return-type,
-  -readability-identifier-length
+  -readability-identifier-length,
+  -bugprone-easily-swappable-parameters,
+  -cppcoreguidelines-avoid-magic-numbers,
+  -readability-magic-numbers,
 
 WarningsAsErrors: "*"
-
 HeaderFilterRegex: "*.(h|hpp)"
 ImplementationFileExtensions:
   - c

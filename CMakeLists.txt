@@ -16,6 +16,13 @@ project(
 
 add_executable(VkRenderer)
 
+target_compile_definitions(
+  VkRenderer
+  PUBLIC
+    VULKAN_HPP_DISPATCH_LOADER_DYNAMIC
+    VULKAN_HPP_NO_CONSTRUCTORS
+)
+
 target_link_libraries(
   VkRenderer
   PRIVATE
@@ -27,5 +34,64 @@ target_link_libraries(
     GPUOpen::VulkanMemoryAllocator
 )
 
+target_include_directories(
+  VkRenderer
+  PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/src"
+)
+
 add_subdirectory("src")
 add_subdirectory("third_party")
+
+if (WIN32)
+  add_custom_command (
+    TARGET VkRenderer POST_BUILD
+    COMMAND "${CMAKE_COMMAND}" -E copy -t "$<TARGET_FILE_DIR:VkRenderer>"
+            "$<TARGET_RUNTIME_DLLS:VkRenderer>"
+    USES_TERMINAL
+    COMMAND_EXPAND_LISTS
+  )
+endif ()
+
+find_program(
+  GLSLC_EXECUTABLE
+  NAMES "glslc"
+  HINTS
+    "$ENV{VULKAN_SDK}/Bin"
+    "$ENV{VULKAN_SDK}/bin"
+)
+
+if (NOT GLSLC_EXECUTABLE)
+  message(FATAL_ERROR "glslc not found! Please install the Vulkan SDK.")
+endif()
+
+set(SHADER_DIR "${CMAKE_CURRENT_SOURCE_DIR}/shaders")
+set(SPIRV_DIR "${CMAKE_CURRENT_BINARY_DIR}/shaders")
+
+file(GLOB SHADERS "${SHADER_DIR}/*.vert" "${SHADER_DIR}/*.frag" "${SHADER_DIR}/*.comp")
+
+set(SPIRV_OUTPUTS "")
+
+foreach (SHADER ${SHADERS})
+  get_filename_component(SHADER_NAME ${SHADER} NAME)
+  set(SPIRV "${SPIRV_DIR}/${SHADER_NAME}.spv")
+
+  add_custom_command(
+    OUTPUT ${SPIRV}
+    COMMAND ${GLSLC_EXECUTABLE} -o ${SPIRV} ${SHADER}
+    DEPENDS ${SHADER}
+    COMMENT "Compiling shader ${SHADER_NAME}"
+    VERBATIM
+  )
+  list(APPEND SPIRV_OUTPUTS ${SPIRV})
+endforeach()
+
+add_custom_target(compile_shaders ALL DEPENDS ${SPIRV_OUTPUTS})
+add_dependencies(VkRenderer compile_shaders)
+
+add_custom_command(
+  TARGET VkRenderer POST_BUILD
+  COMMAND ${CMAKE_COMMAND} -E copy_directory
+          "${SPIRV_DIR}"
+          "$<TARGET_FILE_DIR:VkRenderer>/shaders"
+)
