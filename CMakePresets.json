@@ -1,0 +1,104 @@
+{
+  "$schema": "https://cmake.org/cmake/help/latest/_downloads/3e2d73bff478d88a7de0de736ba5e361/schema.json",
+  "version": 8,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 22,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "base",
+      "hidden": true,
+      "binaryDir": "${sourceDir}/out/build/${presetName}",
+      "installDir": "${sourceDir}/out/install/${presetName}",
+      "generator": "Ninja",
+      "cacheVariables": {
+        "CMAKE_EXPORT_COMPILE_COMMANDS": true
+      }
+    },
+    {
+      "name": "debug",
+      "hidden": true,
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    },
+    {
+      "name": "release",
+      "hidden": true,
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    },
+    {
+      "name": "windows",
+      "hidden": true,
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      }
+    },
+    {
+      "name": "windows-msvc-x64",
+      "inherits": ["base", "windows"],
+      "hidden": true,
+      "cacheVariables": {
+        "CMAKE_C_COMPILER": "cl.exe",
+        "CMAKE_CXX_COMPILER": "cl.exe"
+      }
+    },
+    {
+      "name": "windows-clang-x64",
+      "inherits": ["base", "windows"],
+      "hidden": true,
+      "cacheVariables": {
+        "CMAKE_C_COMPILER": "clang-cl.exe",
+        "CMAKE_CXX_COMPILER": "clang-cl.exe"
+      }
+    },
+    {
+      "name": "windows-msvc-x64-debug",
+      "displayName": "Windows MSVC x64 Debug Configuration",
+      "inherits": ["base", "debug", "windows-msvc-x64"]
+    },
+    {
+      "name": "windows-msvc-x64-release",
+      "displayName": "Windows MSVC x64 Release Configuration",
+      "inherits": ["base", "release", "windows-msvc-x64"]
+    },
+    {
+      "name": "windows-clang-x64-debug",
+      "displayName": "Windows Clang x64 Debug Configuration",
+      "inherits": ["base", "debug", "windows-clang-x64"]
+    },
+    {
+      "name": "windows-clang-x64-release",
+      "displayName": "Windows Clang x64 Release Configuration",
+      "inherits": ["base", "release", "windows-clang-x64"]
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "windows-msvc-x64-debug",
+      "configurePreset": "windows-msvc-x64-debug",
+      "displayName": "Windows MSVC x64 Debug Build"
+    },
+    {
+      "name": "windows-msvc-x64-release",
+      "configurePreset": "windows-msvc-x64-release",
+      "displayName": "Windows MSVC x64 Release Build"
+    },
+    {
+      "name": "windows-clang-x64-debug",
+      "configurePreset": "windows-clang-x64-debug",
+      "displayName": "Windows Clang x64 Debug Build"
+    },
+    {
+      "name": "windows-clang-x64-release",
+      "configurePreset": "windows-clang-x64-release",
+      "displayName": "Windows Clang x64 Release Build"
+    }
+  ]
+}

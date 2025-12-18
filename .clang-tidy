@@ -1,0 +1,70 @@
+Checks: >
+  -*,
+  bugprone-*,
+  cert-*,
+  concurrency-*,
+  cppcoreguidelines-*,
+  misc-*,
+  modernize-*,
+  performance-*,
+  readability-*,
+  clang-analyzer-*,
+
+  -modernize-use-trailing-return-type,
+  -readability-identifier-length
+
+WarningsAsErrors: "*"
+
+HeaderFilterRegex: "*.(h|hpp)"
+ImplementationFileExtensions:
+  - c
+  - cpp
+
+SystemHeaders: false
+UseColor: true
+
+CheckOptions:
+  # Data structures
+  readability-identifier-naming.AbstractClassPrefix: "A"
+  readability-identifier-naming.ClassCase: "CamelCase"
+  readability-identifier-naming.ClassMemberSuffix: "_"
+
+  readability-identifier-naming.EnumCase: "CamelCase"
+  readability-identifier-naming.EnumConstantCase: "UPPER_CASE"
+  readability-identifier-naming.ScopedEnumConstantCase: "CamelCase"
+  readability-identifier-naming.ScopedEnumConstantPrefix: "e"
+
+  readability-identifier-naming.UnionCase: "CamelCase"
+  readability-identifier-naming.UnionMemberCase: "camelBack"
+
+  readability-identifier-naming.StructCase: "CamelCase"
+  readability-identifier-naming.StructMemberCase: "camelBack"
+
+  # Concepts and templates
+  readability-identifier-naming.ConceptCase: "CamelCase"
+  readability-identifier-naming.TemplateParameterCase: "CamelCase"
+
+  # Variables
+  readability-identifier-naming.NamespaceCase: "lower_case"
+
+  readability-identifier-naming.MacroDefinitionCase: "UPPER_CASE"
+  readability-identifier-naming.FunctionCase: "CamelCase"
+  readability-identifier-naming.MethodCase: "CamelCase"
+
+  readability-identifier-naming.VariableCase: "camelBack"
+
+  readability-identifier-naming.ConstantCase: "CamelCase"
+  readability-identifier-naming.ConstantPrefix: "k"
+  readability-identifier-naming.ConstexprVariableCase: "CamelCase"
+  readability-identifier-naming.ConstexprVariablePrefix: "k"
+
+  # Type aliases and typedefs
+  readability-identifier-naming.TypeAliasCase: "CamelCase"
+  readability-identifier-naming.TypedefCase: "lower_case"
+  readability-identifier-naming.TypedefSuffix: "_t"
+
+  # Macros
+  cppcoreguidelines-macro-usage.CheckCapsOnly: true
+
+  # Allow default destructor for sole special member function
+  cppcoreguidelines-special-member-functions.AllowSoleDefaultDtor: true
