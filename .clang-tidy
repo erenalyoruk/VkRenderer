@@ -70,3 +70,5 @@ CheckOptions:
 
   # Allow default destructor for sole special member function
   cppcoreguidelines-special-member-functions.AllowSoleDefaultDtor: true
+
+  cppcoreguidelines-avoid-non-const-global-variables.AllowInternalLinkage: true

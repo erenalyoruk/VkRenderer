@@ -4,10 +4,22 @@
 #include <span>
 #include <stdexcept>
 
+#include "logger.hpp"
+
+namespace {
+void DestroySDLWindow(SDL_Window* window) {
+  if (window != nullptr) {
+    LOG_DEBUG("Destroying SDL window.");
+    SDL_DestroyWindow(window);
+  }
+}
+}  // namespace
+
 Window::Window(int width, int height, const std::string& title)
-    : window_{nullptr, SDL_DestroyWindow}, width_{width}, height_{height} {
+    : window_{nullptr, DestroySDLWindow}, width_{width}, height_{height} {
   if (!SDL_Init(SDL_INIT_VIDEO)) {
-    throw std::runtime_error{"Failed to initialize SDL"};
+    LOG_CRITICAL("Failed to initialize SDL! SDL_Error: {}", SDL_GetError());
+    throw std::runtime_error{"Failed to initialize SDL."};
   }
 
   SDL_WindowFlags windowFlags{SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE |
@@ -15,14 +27,18 @@ Window::Window(int width, int height, const std::string& title)
 
   window_.reset(SDL_CreateWindow(title.c_str(), width_, height_, windowFlags));
   if (window_ == nullptr) {
-    throw std::runtime_error{"Failed to create SDL window"};
+    LOG_CRITICAL("Failed to create SDL window! SDL_Error: {}", SDL_GetError());
+    throw std::runtime_error{"Failed to create SDL window."};
   }
+
+  LOG_DEBUG("SDL window created.");
 }
 
 Window::~Window() {
   window_.reset();
 
   SDL_Quit();
+  LOG_DEBUG("SDL terminated.");
 }
 
 void Window::PollEvents() {
