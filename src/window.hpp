@@ -1,5 +1,6 @@
 #pragma once
 
+#include <functional>
 #include <memory>
 #include <string>
 #include <vector>
@@ -7,6 +8,8 @@
 #include <SDL3/SDL.h>
 #include <SDl3/SDL_vulkan.h>
 #include <vulkan/vulkan.hpp>
+
+#include "input.hpp"
 
 class Window {
  public:
@@ -21,15 +24,23 @@ class Window {
 
   void PollEvents();
 
+  void SetOnResize(std::function<void(int, int)> callback) {
+    resizeCallback_ = std::move(callback);
+  }
+
   [[nodiscard]] auto GetRequiredVulkanExtensions() const
       -> std::vector<const char*>;
 
-  [[nodiscard]] bool CreateSurface(VkInstance instance,
-                                   VkSurfaceKHR* surface) const;
+  [[nodiscard]] vk::SurfaceKHR CreateSurface(vk::Instance instance) const;
 
   [[nodiscard]] SDL_Window& GetHandle() const { return *window_; }
 
   [[nodiscard]] bool ShouldClose() const { return shouldClose_; }
+
+  [[nodiscard]] Input& GetInput() { return input_; }
+
+  [[nodiscard]] int GetWidth() const { return width_; }
+  [[nodiscard]] int GetHeight() const { return height_; }
 
  private:
   std::unique_ptr<SDL_Window, decltype(&SDL_DestroyWindow)> window_{
@@ -39,4 +50,8 @@ class Window {
   int height_{0};
 
   bool shouldClose_{false};
+
+  std::function<void(int, int)> resizeCallback_{nullptr};
+
+  Input input_;
 };

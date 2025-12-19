@@ -1,5 +1,14 @@
 target_sources(
   VkRenderer
   PRIVATE
-    "instance.cpp"
+    "context.cpp"
+    "allocator.cpp"
+    "buffer.cpp"
+    "command_system.cpp"
+    "swapchain.cpp"
+    "frame_manager.cpp"
+    "shader.cpp"
+    "pipeline.cpp"
+    "descriptors.cpp"
+    "renderer.cpp"
 )

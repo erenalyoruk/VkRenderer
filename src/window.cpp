@@ -64,10 +64,20 @@ Window& Window::operator=(Window&& other) noexcept {
 void Window::PollEvents() {
   SDL_Event event{};
   while (SDL_PollEvent(&event)) {
+    input_.ProcessEvent(event);
+
     switch (event.type) {
       case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
         shouldClose_ = true;
         break;
+      case SDL_EVENT_WINDOW_RESIZED: {
+        width_ = event.window.data1;
+        height_ = event.window.data2;
+        if (resizeCallback_ != nullptr) {
+          resizeCallback_(width_, height_);
+        }
+        break;
+      }
       default:
         break;
     }
@@ -89,6 +99,9 @@ std::vector<const char*> Window::GetRequiredVulkanExtensions() const {
   return {span.begin(), span.end()};
 }
 
-bool Window::CreateSurface(VkInstance instance, VkSurfaceKHR* surface) const {
-  return SDL_Vulkan_CreateSurface(window_.get(), instance, nullptr, surface);
+vk::SurfaceKHR Window::CreateSurface(vk::Instance instance) const {
+  VkSurfaceKHR surface{};
+  SDL_Vulkan_CreateSurface(window_.get(), instance, nullptr, &surface);
+
+  return vk::SurfaceKHR{surface};
 }

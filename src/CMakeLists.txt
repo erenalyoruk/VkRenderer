@@ -3,6 +3,8 @@ target_sources(
   PRIVATE
     "main.cpp"
     "window.cpp"
+    "input.cpp"
+    "application.cpp"
 )
 
 add_subdirectory("gpu")

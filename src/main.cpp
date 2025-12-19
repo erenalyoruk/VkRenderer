@@ -1,11 +1,6 @@
-
-#include <vulkan/vulkan.hpp>
-
-#include "gpu/instance.hpp"
+#include "application.hpp"
+#include "gpu/renderer.hpp"
 #include "logger.hpp"
-#include "window.hpp"
-
-VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
 
 int main() {
   quill::Backend::start();
@@ -18,14 +13,13 @@ int main() {
 #endif
   );
 
-  Window window{1280, 720, "Vulkan Window"};
+  Application app(1280, 720, "Vulkan Renderer");
+  gpu::Renderer renderer{app.GetWindow()};
 
-  gpu::Instance instance{"Vulkan Renderer",
-                         window.GetRequiredVulkanExtensions()};
+  app.GetWindow().SetOnResize(
+      [&renderer](int width, int height) { renderer.Resize(width, height); });
 
-  while (!window.ShouldClose()) {
-    window.PollEvents();
-  }
+  app.Run([&]() { renderer.RenderFrame(); });
 
   return 0;
 }
