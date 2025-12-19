@@ -1,11 +1,13 @@
 #pragma once
 
 #include <cstdint>
+#include <memory>
 #include <optional>
 #include <vector>
 
 #include <vulkan/vulkan.hpp>
 
+#include "gpu/allocator.hpp"
 #include "window.hpp"
 
 namespace gpu {
@@ -46,6 +48,8 @@ class Context {
     return queueFamilyIndices_;
   }
 
+  [[nodiscard]] Allocator& GetAllocator() const { return *allocator_; }
+
  private:
   const std::vector<const char*> kValidationLayers{
       "VK_LAYER_KHRONOS_validation"};
@@ -68,6 +72,8 @@ class Context {
   vk::Queue graphicsQueue_{VK_NULL_HANDLE};
   vk::Queue computeQueue_{VK_NULL_HANDLE};
   vk::Queue transferQueue_{VK_NULL_HANDLE};
+
+  std::unique_ptr<Allocator> allocator_{nullptr};
 
   static void InitializeVulkanLoader();
   void CreateInstance(const std::vector<const char*>& windowExtensions,

@@ -13,13 +13,14 @@ class DescriptorLayoutBuilder {
   DescriptorLayoutBuilder& AddBinding(
       uint32_t binding, vk::DescriptorType type,
       vk::ShaderStageFlags stageFlags = vk::ShaderStageFlagBits::eAll,
-      uint32_t count = 1);
+      uint32_t count = 1, bool variableCount = false);
 
   vk::UniqueDescriptorSetLayout Build(
       vk::Device device, vk::DescriptorSetLayoutCreateFlags flags = {});
 
  private:
   std::vector<vk::DescriptorSetLayoutBinding> bindings_;
+  std::vector<vk::DescriptorBindingFlags> bindingFlags_;
 };
 
 class DescriptorAllocator {

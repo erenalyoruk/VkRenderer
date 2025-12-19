@@ -7,22 +7,35 @@
 namespace gpu {
 DescriptorLayoutBuilder& DescriptorLayoutBuilder::AddBinding(
     uint32_t binding, vk::DescriptorType descriptorType,
-    vk::ShaderStageFlags stageFlags, uint32_t count) {
+    vk::ShaderStageFlags stageFlags, uint32_t count, bool variableCount) {
   vk::DescriptorSetLayoutBinding layoutBinding{
       .binding = binding,
       .descriptorType = descriptorType,
       .descriptorCount = count,
       .stageFlags = stageFlags,
-      .pImmutableSamplers = nullptr,
   };
 
   bindings_.push_back(layoutBinding);
+
+  vk::DescriptorBindingFlags flags{};
+  if (variableCount) {
+    flags |= vk::DescriptorBindingFlagBits::eVariableDescriptorCount |
+             vk::DescriptorBindingFlagBits::ePartiallyBound;
+  }
+
+  bindingFlags_.push_back(flags);
   return *this;
 }
 
 vk::UniqueDescriptorSetLayout DescriptorLayoutBuilder::Build(
     vk::Device device, vk::DescriptorSetLayoutCreateFlags flags) {
+  vk::DescriptorSetLayoutBindingFlagsCreateInfo bindingFlagsInfo{
+      .bindingCount = static_cast<uint32_t>(bindingFlags_.size()),
+      .pBindingFlags = bindingFlags_.data(),
+  };
+
   return device.createDescriptorSetLayoutUnique({
+      .pNext = &bindingFlagsInfo,
       .flags = flags,
       .bindingCount = static_cast<uint32_t>(bindings_.size()),
       .pBindings = bindings_.data(),

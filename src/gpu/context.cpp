@@ -53,6 +53,8 @@ Context::Context(Window& window, bool enableValidationLayers)
     SelectPhysicalDevice();
     CreateLogicalDevice();
 
+    allocator_ = std::make_unique<Allocator>(*this);
+
     LOG_DEBUG("VulkanContext initialized.");
   } catch (const vk::SystemError& err) {
     LOG_CRITICAL("Vulkan initialization failure: {}", err.what());
@@ -64,6 +66,8 @@ Context::~Context() {
   if (device_) {
     device_->waitIdle();
   }
+
+  allocator_.reset();
 }
 
 void Context::InitializeVulkanLoader() { VULKAN_HPP_DEFAULT_DISPATCHER.init(); }

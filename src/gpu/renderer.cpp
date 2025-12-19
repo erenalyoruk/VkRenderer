@@ -20,6 +20,10 @@ Renderer::Renderer(Window& window, bool enableValidationLayers)
       *context_, static_cast<uint32_t>(window_.GetWidth()),
       static_cast<uint32_t>(window_.GetHeight()));
   frameManager_ = std::make_unique<FrameManager>(*context_, *commandSystem_);
+  materialPalette_ = std::make_unique<MaterialPalette>(*context_);
+
+  Material defaultMat{.diffuseIndex = 0, .normalIndex = 1};
+  materialPalette_->AddMaterial(defaultMat);
 
   isInitialized_ = true;
   LOG_DEBUG("Renderer initialized successfully.");
@@ -40,6 +44,7 @@ Renderer::~Renderer() {
   frameManager_.reset();
   swapchain_.reset();
   commandSystem_.reset();
+  materialPalette_.reset();
   context_.reset();
 
   isInitialized_ = false;

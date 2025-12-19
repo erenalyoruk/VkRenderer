@@ -3,9 +3,9 @@
 #include <vk_mem_alloc.h>
 #include <vulkan/vulkan.hpp>
 
-#include "gpu/context.hpp"
-
 namespace gpu {
+class Context;
+
 class Allocator {
  public:
   explicit Allocator(const Context& context);

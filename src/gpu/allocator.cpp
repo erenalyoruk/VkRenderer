@@ -11,6 +11,7 @@
 
 #include <utility>
 
+#include "gpu/context.hpp"
 #include "logger.hpp"
 
 #define MAP_VMA_TO_VULKAN(fn) .fn = VULKAN_HPP_DEFAULT_DISPATCHER.fn

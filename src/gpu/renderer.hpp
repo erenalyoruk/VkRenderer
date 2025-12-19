@@ -5,6 +5,7 @@
 #include "gpu/command_system.hpp"
 #include "gpu/context.hpp"
 #include "gpu/frame_manager.hpp"
+#include "gpu/material_palette.hpp"
 #include "gpu/swapchain.hpp"
 #include "window.hpp"
 
@@ -28,6 +29,7 @@ class Renderer {
   std::unique_ptr<CommandSystem> commandSystem_;
   std::unique_ptr<Swapchain> swapchain_;
   std::unique_ptr<FrameManager> frameManager_;
+  std::unique_ptr<MaterialPalette> materialPalette_;
 
   bool isInitialized_{false};
 };

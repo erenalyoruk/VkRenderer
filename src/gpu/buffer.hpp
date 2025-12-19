@@ -7,6 +7,7 @@
 #include <vulkan/vulkan.hpp>
 
 #include "gpu/allocator.hpp"
+#include "logger.hpp"
 
 namespace gpu {
 class Buffer {
@@ -36,9 +37,18 @@ class Buffer {
   template <typename T>
   void Upload(std::span<const T> data, size_t offset = 0) {
     size_t bytes{data.size_bytes()};
-    LOG_ASSERT(bytes + offset <= size_, "Buffer overflow in upload!");
+    if (bytes + offset > size_) {
+      LOG_ERROR(
+          "Buffer overflow in upload! Data size: {}, Offset: {}, Buffer "
+          "size: {}",
+          bytes, offset, size_);
+    }
 
-    LOG_ASSERT(offset % alignof(T) == 0, "Offset not properly aligned!");
+    if (offset % alignof(T) != 0) {
+      LOG_ERROR(
+          "Offset not properly aligned! Offset: {}, Required alignment: {}",
+          offset, alignof(T));
+    }
 
     void* dest{Map()};
     if (dest != nullptr) {
