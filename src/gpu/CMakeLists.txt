@@ -13,4 +13,5 @@ target_sources(
     "renderer.cpp"
     "global_shader_data.cpp"
     "material_palette.cpp"
+    "asset_loader.cpp"
 )

@@ -32,6 +32,7 @@ target_link_libraries(
     ImGui::ImGui
     glm::glm
     GPUOpen::VulkanMemoryAllocator
+    tinygltf
 )
 
 target_include_directories(
@@ -65,8 +66,8 @@ if (NOT GLSLC_EXECUTABLE)
   message(FATAL_ERROR "glslc not found! Please install the Vulkan SDK.")
 endif()
 
-set(SHADER_DIR "${CMAKE_CURRENT_SOURCE_DIR}/shaders")
-set(SPIRV_DIR "${CMAKE_CURRENT_BINARY_DIR}/shaders")
+set(SHADER_DIR "${CMAKE_CURRENT_SOURCE_DIR}/assets/shaders")
+set(SPIRV_DIR "${CMAKE_CURRENT_BINARY_DIR}/assets/shaders")
 
 file(GLOB SHADERS "${SHADER_DIR}/*.vert" "${SHADER_DIR}/*.frag" "${SHADER_DIR}/*.comp")
 
@@ -93,5 +94,12 @@ add_custom_command(
   TARGET VkRenderer POST_BUILD
   COMMAND ${CMAKE_COMMAND} -E copy_directory
           "${SPIRV_DIR}"
-          "$<TARGET_FILE_DIR:VkRenderer>/shaders"
+          "$<TARGET_FILE_DIR:VkRenderer>/assets/shaders"
+)
+
+add_custom_command(
+  TARGET VkRenderer POST_BUILD
+  COMMAND ${CMAKE_COMMAND} -E copy_directory
+          "${CMAKE_CURRENT_SOURCE_DIR}/assets/models"
+          "$<TARGET_FILE_DIR:VkRenderer>/assets/models"
 )

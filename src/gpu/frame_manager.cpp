@@ -24,11 +24,21 @@ FrameManager::FrameManager(Context& context, CommandSystem& commandSystem)
 
 FrameManager::~FrameManager() { context_.GetDevice().waitIdle(); }
 
+void FrameManager::EnqueueDeletion(std::function<void()> deletion) {
+  PerFrameData& frame{perFrameData_.at(currentFrameIndex_)};
+  frame.deletions.push_back(std::move(deletion));
+}
+
 std::optional<uint32_t> FrameManager::BeginFrame(Swapchain& swapchain) {
   PerFrameData& frame{perFrameData_.at(currentFrameIndex_)};
   vk::Device device{context_.GetDevice()};
   auto waitResult{
       device.waitForFences(frame.inFlightFence.get(), VK_TRUE, UINT64_MAX)};
+
+  for (auto& fn : frame.deletions) {
+    fn();
+  }
+  frame.deletions.clear();
 
   try {
     auto resultValue{

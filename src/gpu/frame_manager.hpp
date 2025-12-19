@@ -2,7 +2,9 @@
 
 #include <array>
 #include <cstdint>
+#include <functional>
 #include <optional>
+#include <vector>
 
 #include <vulkan/vulkan.hpp>
 
@@ -18,12 +20,16 @@ struct PerFrameData {
   vk::UniqueFence inFlightFence;
 
   vk::UniqueCommandBuffer commandBuffer;
+
+  std::vector<std::function<void()>> deletions;
 };
 
 class FrameManager {
  public:
   FrameManager(Context& context, CommandSystem& commandSystem);
   ~FrameManager();
+
+  void EnqueueDeletion(std::function<void()> deletion);
 
   std::optional<uint32_t> BeginFrame(Swapchain& swapchain);
 
