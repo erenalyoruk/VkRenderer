@@ -8,6 +8,11 @@ namespace vulkan {
 Buffer Buffer::Create(Allocator& allocator, vk::DeviceSize size,
                       vk::BufferUsageFlags usage, VmaMemoryUsage memoryUsage,
                       VmaAllocationCreateFlags allocFlags) {
+  if (size == 0) {
+    LOG_ERROR("Cannot create buffer of size 0!");
+    return {};
+  }
+
   VkBufferCreateInfo bufferInfo{
       .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
       .size = size,
@@ -25,6 +30,10 @@ Buffer Buffer::Create(Allocator& allocator, vk::DeviceSize size,
   VkResult res{vmaCreateBuffer(allocator.GetHandle(), &bufferInfo,
                                &vmaAllocInfo, &rawBuffer, &allocation,
                                nullptr)};
+  if (res != VK_SUCCESS) {
+    LOG_ERROR("Failed to create buffer of size {}!", size);
+    return {};
+  }
 
   vk::DeviceAddress deviceAddress{};
   if (usage & vk::BufferUsageFlagBits::eShaderDeviceAddress) {

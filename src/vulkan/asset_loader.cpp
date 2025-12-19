@@ -104,6 +104,16 @@ Mesh AssetLoader::LoadMesh(const std::string& filepath) {
     }
   }
 
+  if (vertices.empty()) {
+    LOG_ERROR("Mesh has no vertices");
+    return {};
+  }
+
+  if (indices.empty()) {
+    LOG_ERROR("Mesh has no indices");
+    return {};
+  }
+
   Buffer vertexBuffer{Buffer::Create(
       context_.GetAllocator(), vertices.size() * sizeof(Vertex),
       vk::BufferUsageFlagBits::eVertexBuffer, VMA_MEMORY_USAGE_AUTO,

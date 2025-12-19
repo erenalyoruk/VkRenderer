@@ -23,6 +23,8 @@ Window::Window(int width, int height, const std::string& title)
     throw std::runtime_error{"Failed to initialize SDL."};
   }
 
+  LOG_DEBUG("SDL initialized.");
+
   SDL_WindowFlags windowFlags{SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE |
                               SDL_WINDOW_HIGH_PIXEL_DENSITY};
 
@@ -62,6 +64,8 @@ Window& Window::operator=(Window&& other) noexcept {
 }
 
 void Window::PollEvents() {
+  input_.Update();
+
   SDL_Event event{};
   while (SDL_PollEvent(&event)) {
     input_.ProcessEvent(event);
@@ -73,8 +77,8 @@ void Window::PollEvents() {
       case SDL_EVENT_WINDOW_RESIZED: {
         width_ = event.window.data1;
         height_ = event.window.data2;
-        if (resizeCallback_ != nullptr) {
-          resizeCallback_(width_, height_);
+        for (const auto& callback : resizeCallback_) {
+          callback(width_, height_);
         }
         break;
       }

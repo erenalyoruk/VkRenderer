@@ -3,6 +3,7 @@
 #include <functional>
 #include <string>
 
+#include "camera.hpp"
 #include "input.hpp"
 #include "window.hpp"
 
@@ -16,6 +17,9 @@ class Application {
 
   [[nodiscard]] Input& GetInput() { return window_.GetInput(); }
 
+  [[nodiscard]] Camera& GetCamera() { return camera_; }
+
  private:
   Window window_;
+  Camera camera_;
 };

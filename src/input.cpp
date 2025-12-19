@@ -11,28 +11,28 @@ void Input::Update() {
 void Input::ProcessEvent(const SDL_Event& event) {
   switch (event.type) {
     case SDL_EVENT_KEY_DOWN:
-      if (event.key.repeat) {
-        currentKeys_.at(event.key.scancode) = true;
-      }
+      currentKeys_.at(event.key.scancode) = true;
       break;
     case SDL_EVENT_KEY_UP:
       currentKeys_.at(event.key.scancode) = false;
       break;
     case SDL_EVENT_MOUSE_BUTTON_DOWN:
-      if (event.button.button <= 6) {
-        currentMouseButtons_.at(event.button.button - 1) = true;
-      }
+      currentMouseButtons_.at(event.button.button - 1) = true;
       break;
     case SDL_EVENT_MOUSE_BUTTON_UP:
-      if (event.button.button <= 6) {
-        currentMouseButtons_.at(event.button.button - 1) = false;
-      }
+      currentMouseButtons_.at(event.button.button - 1) = false;
       break;
     case SDL_EVENT_MOUSE_MOTION: {
-      glm::vec2 newPosition(static_cast<float>(event.motion.x),
-                            static_cast<float>(event.motion.y));
-      mouseDelta_ += newPosition - mousePosition_;
-      mousePosition_ = newPosition;
+      glm::vec2 mouseDelta{
+          static_cast<float>(event.motion.xrel),
+          static_cast<float>(event.motion.yrel),
+      };
+      mouseDelta_ += mouseDelta;
+
+      mousePosition_ = glm::vec2{
+          static_cast<float>(event.motion.x),
+          static_cast<float>(event.motion.y),
+      };
       break;
     }
     case SDL_EVENT_MOUSE_WHEEL:

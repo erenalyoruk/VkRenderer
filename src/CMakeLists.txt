@@ -9,3 +9,4 @@ target_sources(
 )
 
 add_subdirectory("vulkan")
+add_subdirectory("rendering")

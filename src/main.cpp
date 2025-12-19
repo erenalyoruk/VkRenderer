@@ -1,6 +1,6 @@
 #include "application.hpp"
 #include "logger.hpp"
-#include "vulkan/renderer.hpp"
+#include "rendering/renderer.hpp"
 
 int main() {
   quill::Backend::start();
@@ -14,9 +14,12 @@ int main() {
   );
 
   Application app(1280, 720, "Vulkan Renderer");
-  vulkan::Renderer renderer{app.GetWindow()};
+  rendering::Renderer renderer{app.GetWindow(), true};
 
-  app.Run([&]() { renderer.RenderFrame(); });
+  app.Run([&]() {
+    renderer.SetViewProjection(app.GetCamera().GetViewProjectionMatrix());
+    renderer.RenderFrame();
+  });
 
   return 0;
 }

@@ -24,8 +24,8 @@ class Window {
 
   void PollEvents();
 
-  void SetOnResize(std::function<void(int, int)> callback) {
-    resizeCallback_ = std::move(callback);
+  void AddOnResize(std::function<void(int, int)> callback) {
+    resizeCallback_.push_back(std::move(callback));
   }
 
   [[nodiscard]] auto GetRequiredVulkanExtensions() const
@@ -51,7 +51,7 @@ class Window {
 
   bool shouldClose_{false};
 
-  std::function<void(int, int)> resizeCallback_{nullptr};
+  std::vector<std::function<void(int, int)>> resizeCallback_;
 
   Input input_;
 };
