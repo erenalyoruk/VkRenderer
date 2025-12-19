@@ -6,6 +6,7 @@
 #include "rhi/device.hpp"      // IWYU pragma: export
 #include "rhi/factory.hpp"     // IWYU pragma: export
 #include "rhi/pipeline.hpp"    // IWYU pragma: export
+#include "rhi/queue.hpp"       // IWYU pragma: export
 #include "rhi/sampler.hpp"     // IWYU pragma: export
 #include "rhi/shader.hpp"      // IWYU pragma: export
 #include "rhi/swapchain.hpp"   // IWYU pragma: export

@@ -10,3 +10,5 @@ target_sources(
 
 add_subdirectory("vulkan")
 add_subdirectory("rendering")
+add_subdirectory("rhi")
+add_subdirectory("backends")

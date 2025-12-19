@@ -1,6 +1,6 @@
 #include "application.hpp"
 #include "logger.hpp"
-#include "rendering/renderer.hpp"
+#include "rhi/backend.hpp"
 
 int main() {
   quill::Backend::start();
@@ -14,12 +14,9 @@ int main() {
   );
 
   Application app(1280, 720, "Vulkan Renderer");
-  rendering::Renderer renderer{app.GetWindow(), true};
 
-  app.Run([&]() {
-    renderer.SetViewProjection(app.GetCamera().GetViewProjectionMatrix());
-    renderer.RenderFrame();
-  });
+  auto [device, factory]{rhi::BackendFactory::Create(rhi::BackendType::Vulkan,
+                                                     app.GetWindow(), true)};
 
   return 0;
 }

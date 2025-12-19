@@ -15,6 +15,11 @@ enum class BufferUsage : uint8_t {
   Storage = 1 << 3,  // Storage buffer
 };
 
+constexpr BufferUsage operator&(BufferUsage a, BufferUsage b) {
+  return static_cast<BufferUsage>(static_cast<uint8_t>(a) &
+                                  static_cast<uint8_t>(b));
+}
+
 /**
  * @brief Abstract base class for RHI buffer objects.
  */
