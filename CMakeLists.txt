@@ -33,6 +33,7 @@ target_link_libraries(
     glm::glm
     GPUOpen::VulkanMemoryAllocator
     tinygltf
+    EnTT::EnTT
 )
 
 target_include_directories(

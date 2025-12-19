@@ -1,6 +1,6 @@
 #include "application.hpp"
-#include "gpu/renderer.hpp"
 #include "logger.hpp"
+#include "vulkan/renderer.hpp"
 
 int main() {
   quill::Backend::start();
@@ -14,10 +14,7 @@ int main() {
   );
 
   Application app(1280, 720, "Vulkan Renderer");
-  gpu::Renderer renderer{app.GetWindow()};
-
-  app.GetWindow().SetOnResize(
-      [&renderer](int width, int height) { renderer.Resize(width, height); });
+  vulkan::Renderer renderer{app.GetWindow()};
 
   app.Run([&]() { renderer.RenderFrame(); });
 

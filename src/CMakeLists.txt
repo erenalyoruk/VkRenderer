@@ -5,6 +5,7 @@ target_sources(
     "window.cpp"
     "input.cpp"
     "application.cpp"
+    "camera.cpp"
 )
 
-add_subdirectory("gpu")
+add_subdirectory("vulkan")
