@@ -148,6 +148,71 @@ std::unique_ptr<VulkanTexture> VulkanTexture::Create(VulkanContext& context,
       context, width, height, format, image, allocation, std::move(imageView)));
 }
 
+std::unique_ptr<VulkanTexture> VulkanTexture::CreateCubemap(
+    VulkanContext& context, uint32_t size, rhi::Format format,
+    rhi::TextureUsage usage, uint32_t mipLevels) {
+  vk::Format vkFormat{ToVkFormat(format)};
+
+  vk::ImageUsageFlags vkUsage;
+  if ((usage & rhi::TextureUsage::Sampled) != rhi::TextureUsage{0}) {
+    vkUsage |= vk::ImageUsageFlagBits::eSampled;
+  }
+  if ((usage & rhi::TextureUsage::Storage) != rhi::TextureUsage{0}) {
+    vkUsage |= vk::ImageUsageFlagBits::eStorage;
+  }
+  if ((usage & rhi::TextureUsage::ColorAttachment) != rhi::TextureUsage{0}) {
+    vkUsage |= vk::ImageUsageFlagBits::eColorAttachment;
+  }
+
+  vkUsage |= vk::ImageUsageFlagBits::eTransferDst;  // For uploads
+
+  vk::ImageCreateInfo imageInfo{
+      .flags = vk::ImageCreateFlagBits::eCubeCompatible,
+      .imageType = vk::ImageType::e2D,
+      .format = vkFormat,
+      .extent = {.width = size, .height = size, .depth = 1},
+      .mipLevels = mipLevels,
+      .arrayLayers = 6,  // Cubemap has 6 faces
+      .samples = vk::SampleCountFlagBits::e1,
+      .tiling = vk::ImageTiling::eOptimal,
+      .usage = vkUsage,
+      .initialLayout = vk::ImageLayout::eUndefined,
+  };
+
+  VmaAllocationCreateInfo allocInfo{
+      .usage = VMA_MEMORY_USAGE_GPU_ONLY,
+  };
+
+  VkImage rawImage{VK_NULL_HANDLE};
+  VmaAllocation allocation{VK_NULL_HANDLE};
+  VkResult res = vmaCreateImage(context.GetAllocator().GetHandle(),
+                                std::bit_cast<VkImageCreateInfo*>(&imageInfo),
+                                &allocInfo, &rawImage, &allocation, nullptr);
+  if (res != VK_SUCCESS) {
+    return nullptr;
+  }
+
+  vk::Image image{rawImage};
+
+  vk::ImageViewCreateInfo viewInfo{
+      .image = image,
+      .viewType = vk::ImageViewType::eCube,  // Cubemap view
+      .format = vkFormat,
+      .subresourceRange =
+          {
+              .aspectMask = vk::ImageAspectFlagBits::eColor,
+              .levelCount = mipLevels,
+              .layerCount = 6,  // All 6 faces
+          },
+  };
+
+  vk::UniqueImageView imageView =
+      context.GetDevice().createImageViewUnique(viewInfo);
+
+  return std::unique_ptr<VulkanTexture>(new VulkanTexture(
+      context, size, size, format, image, allocation, std::move(imageView)));
+}
+
 VulkanTexture::VulkanTexture(VulkanContext& context, uint32_t width,
                              uint32_t height, rhi::Format format,
                              vk::Image image, VmaAllocation allocation,
@@ -169,6 +234,10 @@ void VulkanTexture::Upload(std::span<const std::byte> data, uint32_t mipLevel,
   if (data.empty()) {
     return;
   }
+
+  // Calculate mip level dimensions
+  uint32_t mipWidth = std::max(1U, width_ >> mipLevel);
+  uint32_t mipHeight = std::max(1U, height_ >> mipLevel);
 
   // Create staging buffer and upload data to it
   auto staging = VulkanBuffer::Create(context_.GetAllocator(), data.size(),
@@ -242,7 +311,9 @@ void VulkanTexture::Upload(std::span<const std::byte> data, uint32_t mipLevel,
               .layerCount = 1,
           },
       .imageOffset = {.x = 0, .y = 0, .z = 0},
-      .imageExtent = {.width = width_, .height = height_, .depth = 1},
+      .imageExtent = {.width = mipWidth,
+                      .height = mipHeight,
+                      .depth = 1},  // Use mip dimensions
   };
 
   cmd.copyBufferToImage(staging->GetHandle(), image_,
@@ -287,4 +358,5 @@ void VulkanTexture::Upload(std::span<const std::byte> data, uint32_t mipLevel,
 
   // Command pool and staging buffer are automatically cleaned up
 }
+
 }  // namespace backends::vulkan

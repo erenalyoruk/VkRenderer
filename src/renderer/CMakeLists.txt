@@ -6,4 +6,5 @@ target_sources(
     "pipeline_manager.cpp"
     "gpu_culling.cpp"
     "bindless_materials.cpp"
+    "skybox_ibl.cpp"
 )

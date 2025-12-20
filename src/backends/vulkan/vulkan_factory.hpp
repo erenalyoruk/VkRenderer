@@ -52,6 +52,10 @@ class VulkanFactory : public rhi::Factory {
                                                   uint32_t height,
                                                   rhi::Format format) override;
 
+  std::unique_ptr<rhi::Texture> CreateCubemap(uint32_t size, rhi::Format format,
+                                              rhi::TextureUsage usage,
+                                              uint32_t mipLevels = 1) override;
+
  private:
   VulkanContext& context_;  // NOLINT
 };

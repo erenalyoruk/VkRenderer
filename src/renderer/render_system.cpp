@@ -50,6 +50,8 @@ void RenderSystem::Render(entt::registry& registry, float deltaTime) {
     GlobalUniforms globals{};
     viewProjection = activeCamera_->projection * activeCamera_->view;
     globals.viewProjection = viewProjection;
+    globals.view = activeCamera_->view;
+    globals.projection = activeCamera_->projection;
     globals.cameraPosition = glm::vec4(cameraPosition, 1.0F);
     globals.time = totalTime_;
     totalTime_ += deltaTime;
@@ -219,6 +221,7 @@ void RenderSystem::ExecuteGPUDrivenRendering(entt::registry& registry,
                    static_cast<float>(swapchain->GetHeight()), 0.0F, 1.0F);
   cmd->SetScissor(0, 0, swapchain->GetWidth(), swapchain->GetHeight());
 
+  // Render geometry FIRST
   auto* pipeline = context_.GetPipeline(activePipeline_);
   if (pipeline == nullptr) {
     pipeline = context_.GetPipeline(PipelineType::PBRLit);
@@ -243,15 +246,14 @@ void RenderSystem::ExecuteGPUDrivenRendering(entt::registry& registry,
         context_.GetGPUCulling().GetObjectDescriptorSet()};
     cmd->BindDescriptorSets(pipeline, 2, objectSets);
 
+    // Set 3: IBL
+    std::array<const rhi::DescriptorSet*, 1> iblSets = {
+        context_.GetSkyboxIBL().GetIBLDescriptorSet()};
+    cmd->BindDescriptorSets(pipeline, 3, iblSets);
+
     // Bind mesh buffers and issue indirect draw
     auto view = registry.view<ecs::MeshComponent>();
     std::unordered_set<rhi::Buffer*> processedBuffers;
-
-    // Calculate approximate triangles from object data
-    uint32_t totalTriangles = 0;
-    for (const auto& objData : objectDataCache_) {
-      totalTriangles += objData.indexCount / 3;
-    }
 
     for (auto entity : view) {
       auto& mesh = view.get<ecs::MeshComponent>(entity);
@@ -277,6 +279,33 @@ void RenderSystem::ExecuteGPUDrivenRendering(entt::registry& registry,
           context_.GetGPUCulling().GetDrawCountBuffer(), 0,
           context_.GetGPUCulling().GetMaxDrawCount(),
           sizeof(DrawIndexedIndirectCommand));
+    }
+  }
+
+  // Render skybox LAST (after geometry, will be behind due to depth = 1.0)
+  if (context_.GetSkyboxIBL().IsLoaded()) {
+    auto* skyboxPipeline = context_.GetPipeline(PipelineType::Skybox);
+    if (skyboxPipeline != nullptr) {
+      cmd->BindPipeline(skyboxPipeline);
+
+      // Bind global uniforms (Set 0)
+      std::array<const rhi::DescriptorSet*, 1> globalSets = {
+          frame.globalDescriptorSet.get()};
+      cmd->BindDescriptorSets(skyboxPipeline, 0, globalSets);
+
+      // Bind IBL descriptor set (Set 3)
+      std::array<const rhi::DescriptorSet*, 1> iblSets = {
+          context_.GetSkyboxIBL().GetIBLDescriptorSet()};
+      cmd->BindDescriptorSets(skyboxPipeline, 3, iblSets);
+
+      // Draw skybox cube
+      std::array<const rhi::Buffer*, 1> vertexBuffers = {
+          context_.GetSkyboxIBL().GetCubeVertexBuffer()};
+      std::array<uint64_t, 1> offsets = {0};
+      cmd->BindVertexBuffers(0, vertexBuffers, offsets);
+      cmd->BindIndexBuffer(*context_.GetSkyboxIBL().GetCubeIndexBuffer(), 0,
+                           true);
+      cmd->DrawIndexed(context_.GetSkyboxIBL().GetCubeIndexCount(), 1, 0, 0, 0);
     }
   }
 

@@ -8,6 +8,7 @@
 #include "renderer/bindless_materials.hpp"
 #include "renderer/gpu_culling.hpp"
 #include "renderer/pipeline_manager.hpp"
+#include "renderer/skybox_ibl.hpp"
 #include "rhi/buffer.hpp"
 #include "rhi/command.hpp"
 #include "rhi/descriptor.hpp"
@@ -21,6 +22,8 @@ constexpr uint32_t kMaxFramesInFlight = 2;
 
 struct GlobalUniforms {
   alignas(16) glm::mat4 viewProjection;
+  alignas(16) glm::mat4 view;
+  alignas(16) glm::mat4 projection;
   alignas(16) glm::vec4 cameraPosition;
   alignas(16) glm::vec4 lightDirection;
   alignas(16) glm::vec4 lightColor;
@@ -86,6 +89,8 @@ class RenderContext {
     return *bindlessMaterials_;
   }
 
+  [[nodiscard]] SkyboxIBL& GetSkyboxIBL() { return *skyboxIBL_; }
+
   void UpdateGlobalUniforms(const GlobalUniforms& uniforms);
   void OnSwapchainResized();
 
@@ -113,6 +118,7 @@ class RenderContext {
   PipelineManager pipelineManager_;
 
   std::shared_ptr<rhi::Texture> depthTexture_;
+  std::unique_ptr<SkyboxIBL> skyboxIBL_;
 };
 
 }  // namespace renderer

@@ -25,6 +25,12 @@ class VulkanTexture : public rhi::Texture {
                                                rhi::Format format,
                                                rhi::TextureUsage usage);
 
+  static std::unique_ptr<VulkanTexture> CreateCubemap(VulkanContext& context,
+                                                      uint32_t size,
+                                                      rhi::Format format,
+                                                      rhi::TextureUsage usage,
+                                                      uint32_t mipLevels = 1);
+
   // RHI implementations
   void Upload(std::span<const std::byte> data, uint32_t mipLevel = 0,
               uint32_t arrayLayer = 0) override;

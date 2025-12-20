@@ -19,6 +19,7 @@ enum class DescriptorType : uint8_t {
   CombinedImageSampler,  // Texture + Sampler combined
   StorageImage,          // Storage image for compute
 };
+
 /**
  * @brief Represents a single binding within a descriptor set layout.
  */

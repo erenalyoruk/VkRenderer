@@ -21,12 +21,18 @@ RenderContext::RenderContext(rhi::Device& device, rhi::Factory& factory)
   gpuCulling_ = std::make_unique<GPUCulling>(factory_, device_);
   gpuCulling_->Initialize();
 
+  // Initialize Skybox & IBL first (before pipeline manager needs it)
+  skyboxIBL_ = std::make_unique<SkyboxIBL>(device_, factory_);
+  skyboxIBL_->Initialize();
+
   // Initialize pipeline manager with descriptor layouts:
   // set 0: global uniforms
   // set 1: bindless materials
   // set 2: object data SSBO
+  // set 3: IBL (skybox, irradiance, prefiltered, BRDF LUT)
   pipelineManager_.Initialize(globalDescriptorLayout_.get(),
                               bindlessMaterials_->GetDescriptorLayout(),
+                              skyboxIBL_->GetIBLDescriptorLayout(),
                               gpuCulling_->GetObjectDescriptorLayout());
 
   CreateSyncObjects();

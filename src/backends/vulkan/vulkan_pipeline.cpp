@@ -77,6 +77,29 @@ vk::CullModeFlags ToVkCullMode(rhi::CullMode mode) {
       return vk::CullModeFlagBits::eBack;
   }
 }
+
+vk::CompareOp ToVkCompareOp(rhi::CompareOp op) {
+  switch (op) {
+    case rhi::CompareOp::Less:
+      return vk::CompareOp::eLess;
+    case rhi::CompareOp::LessOrEqual:
+      return vk::CompareOp::eLessOrEqual;
+    case rhi::CompareOp::Greater:
+      return vk::CompareOp::eGreater;
+    case rhi::CompareOp::GreaterOrEqual:
+      return vk::CompareOp::eGreaterOrEqual;
+    case rhi::CompareOp::Equal:
+      return vk::CompareOp::eEqual;
+    case rhi::CompareOp::NotEqual:
+      return vk::CompareOp::eNotEqual;
+    case rhi::CompareOp::Always:
+      return vk::CompareOp::eAlways;
+    case rhi::CompareOp::Never:
+      return vk::CompareOp::eNever;
+    default:
+      return vk::CompareOp::eLess;
+  }
+}
 }  // namespace
 
 std::unique_ptr<VulkanPipelineLayout> VulkanPipelineLayout::Create(
@@ -208,7 +231,7 @@ std::unique_ptr<VulkanPipeline> VulkanPipeline::Create(
           desc.depthTest && desc.depthFormat != rhi::Format::Undefined),
       .depthWriteEnable = static_cast<vk::Bool32>(
           desc.depthWrite && desc.depthFormat != rhi::Format::Undefined),
-      .depthCompareOp = vk::CompareOp::eLess,
+      .depthCompareOp = ToVkCompareOp(desc.depthCompareOp),
   };
 
   // Use blend enabled from desc

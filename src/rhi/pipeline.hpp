@@ -72,6 +72,20 @@ struct VertexAttribute {
 enum class CullMode : uint8_t { None, Front, Back };
 
 /**
+ * @brief Comparison operation for depth/stencil testing
+ */
+enum class CompareOp : uint8_t {
+  Less,
+  LessOrEqual,
+  Greater,
+  GreaterOrEqual,
+  Equal,
+  NotEqual,
+  Always,
+  Never,
+};
+
+/**
  * @brief Structure describing the configuration of a graphics pipeline.
  */
 struct GraphicsPipelineDesc {
@@ -95,6 +109,7 @@ struct GraphicsPipelineDesc {
   // Depth settings
   bool depthTest{true};
   bool depthWrite{true};
+  CompareOp depthCompareOp{CompareOp::Less};
 
   // Rasterization settings
   CullMode cullMode{CullMode::Back};

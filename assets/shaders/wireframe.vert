@@ -10,6 +10,8 @@ layout(location = 0) out vec3 outWorldPos;
 
 layout(set = 0, binding = 0) uniform GlobalUniforms {
   mat4 viewProjection;
+  mat4 view;
+  mat4 projection;
   vec4 cameraPosition;
   vec4 lightDirection;
   vec4 lightColor;

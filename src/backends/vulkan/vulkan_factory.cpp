@@ -81,4 +81,10 @@ std::unique_ptr<rhi::Swapchain> VulkanFactory::CreateSwapchain(
     uint32_t width, uint32_t height, rhi::Format format) {
   return VulkanSwapchain::Create(context_, width, height, format);
 }
+
+std::unique_ptr<rhi::Texture> VulkanFactory::CreateCubemap(
+    uint32_t size, rhi::Format format, rhi::TextureUsage usage,
+    uint32_t mipLevels) {
+  return VulkanTexture::CreateCubemap(context_, size, format, usage, mipLevels);
+}
 }  // namespace backends::vulkan

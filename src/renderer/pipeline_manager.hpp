@@ -15,6 +15,7 @@ enum class PipelineType : uint8_t {
   PBRLit,
   Unlit,
   Wireframe,
+  Skybox,
   ShadowMap,
   Count
 };
@@ -24,6 +25,7 @@ struct PipelineConfig {
   std::string fragmentShaderPath;
   bool depthTest{true};
   bool depthWrite{true};
+  rhi::CompareOp depthCompareOp{rhi::CompareOp::Less};
   bool doubleSided{false};
   bool wireframe{false};
   bool blendEnabled{false};
@@ -35,6 +37,7 @@ class PipelineManager {
 
   void Initialize(rhi::DescriptorSetLayout* globalLayout,
                   rhi::DescriptorSetLayout* materialLayout,
+                  rhi::DescriptorSetLayout* iblLayout,
                   rhi::DescriptorSetLayout* objectLayout = nullptr);
 
   [[nodiscard]] rhi::Pipeline* GetPipeline(PipelineType type);
@@ -56,6 +59,7 @@ class PipelineManager {
   rhi::DescriptorSetLayout* globalLayout_{nullptr};
   rhi::DescriptorSetLayout* materialLayout_{nullptr};
   rhi::DescriptorSetLayout* objectLayout_{nullptr};
+  rhi::DescriptorSetLayout* iblLayout_{nullptr};
 };
 
 }  // namespace renderer

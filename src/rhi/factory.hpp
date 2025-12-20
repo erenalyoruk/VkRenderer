@@ -152,5 +152,18 @@ class Factory {
   virtual std::unique_ptr<Swapchain> CreateSwapchain(uint32_t width,
                                                      uint32_t height,
                                                      Format format) = 0;
+
+  /**
+   * @brief Creates a cubemap texture resource.
+   *
+   * @param size Size of each cubemap face (width = height)
+   * @param format Texture format
+   * @param usage Texture usage flags
+   * @param mipLevels Number of mip levels (for prefiltered maps)
+   * @return std::unique_ptr<Texture> Pointer to the created cubemap
+   */
+  virtual std::unique_ptr<Texture> CreateCubemap(uint32_t size, Format format,
+                                                 TextureUsage usage,
+                                                 uint32_t mipLevels = 1) = 0;
 };
 }  // namespace rhi

@@ -13,23 +13,27 @@ PipelineManager::PipelineManager(rhi::Factory& factory, rhi::Device& device)
 
 void PipelineManager::Initialize(rhi::DescriptorSetLayout* globalLayout,
                                  rhi::DescriptorSetLayout* materialLayout,
+                                 rhi::DescriptorSetLayout* iblLayout,
                                  rhi::DescriptorSetLayout* objectLayout) {
   globalLayout_ = globalLayout;
   materialLayout_ = materialLayout;
+  iblLayout_ = iblLayout;
   objectLayout_ = objectLayout;
 
-  // Create pipeline layout - only include object layout if provided
+  // Create pipeline layout with all descriptor sets
+  // Set 0: Global
+  // Set 1: Materials
+  // Set 2: Objects
+  // Set 3: IBL
   std::vector<rhi::DescriptorSetLayout*> layouts = {
-      globalLayout_,   // set 0
-      materialLayout_  // set 1
+      globalLayout_,    // set 0
+      materialLayout_,  // set 1
+      objectLayout_,    // set 2
+      iblLayout_,       // set 3
   };
 
-  if (objectLayout_ != nullptr) {
-    layouts.push_back(objectLayout_);  // set 2
-  }
-
   std::array<rhi::PushConstantRange, 1> pushConstants = {{
-      {.stage = rhi::ShaderStage::Vertex, .offset = 0, .size = 128},  // 2x mat4
+      {.stage = rhi::ShaderStage::Vertex, .offset = 0, .size = 128},
   }};
 
   pipelineLayout_ = factory_.CreatePipelineLayout(layouts, pushConstants);
@@ -51,8 +55,23 @@ void PipelineManager::Initialize(rhi::DescriptorSetLayout* globalLayout,
                  {
                      .vertexShaderPath = "assets/shaders/wireframe.vert.spv",
                      .fragmentShaderPath = "assets/shaders/wireframe.frag.spv",
+                     .depthTest = true,
+                     .depthWrite = true,
                      .doubleSided = true,
                      .wireframe = true,
+                     .blendEnabled = false,
+                 });
+
+  CreatePipeline(PipelineType::Skybox,
+                 {
+                     .vertexShaderPath = "assets/shaders/skybox.vert.spv",
+                     .fragmentShaderPath = "assets/shaders/skybox.frag.spv",
+                     .depthTest = true,
+                     .depthWrite = false,
+                     .depthCompareOp = rhi::CompareOp::LessOrEqual,
+                     .doubleSided = false,
+                     .wireframe = false,
+                     .blendEnabled = false,
                  });
 }
 
@@ -87,6 +106,7 @@ void PipelineManager::CreatePipeline(PipelineType type,
       .depthFormat = rhi::Format::D32Sfloat,
       .depthTest = config.depthTest,
       .depthWrite = config.depthWrite,
+      .depthCompareOp = config.depthCompareOp,
       .cullMode =
           config.doubleSided ? rhi::CullMode::None : rhi::CullMode::Back,
       .wireframe = config.wireframe,

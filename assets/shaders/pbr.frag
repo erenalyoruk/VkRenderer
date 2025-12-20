@@ -12,6 +12,8 @@ layout(location = 0) out vec4 outColor;
 
 layout(set = 0, binding = 0) uniform GlobalUniforms {
   mat4 viewProjection;
+  mat4 view;
+  mat4 projection;
   vec4 cameraPosition;
   vec4 lightDirection;
   vec4 lightColor;
@@ -38,7 +40,14 @@ layout(std430, set = 1, binding = 0) readonly buffer MaterialBuffer {
 
 layout(set = 1, binding = 1) uniform sampler2D textures[];
 
+// IBL resources
+layout(set = 3, binding = 0) uniform samplerCube skyboxCube;
+layout(set = 3, binding = 1) uniform samplerCube irradianceCube;
+layout(set = 3, binding = 2) uniform samplerCube prefilteredCube;
+layout(set = 3, binding = 3) uniform sampler2D brdfLUT;
+
 const float PI = 3.14159265359;
+const float MAX_REFLECTION_LOD = 4.0;
 
 float DistributionGGX(vec3 N, vec3 H, float roughness) {
   float a = roughness * roughness;
@@ -69,6 +78,11 @@ float GeometrySmith(vec3 N, vec3 V, vec3 L, float roughness) {
 
 vec3 FresnelSchlick(float cosTheta, vec3 F0) {
   return F0 + (1.0 - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
+}
+
+vec3 FresnelSchlickRoughness(float cosTheta, vec3 F0, float roughness) {
+  return F0 + (max(vec3(1.0 - roughness), F0) - F0) *
+                  pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
 }
 
 void main() {
@@ -105,11 +119,14 @@ void main() {
   vec3 N = normalize(inTBN * normalSample);
 
   vec3 V = normalize(global.cameraPosition.xyz - inWorldPos);
-  vec3 L = normalize(-global.lightDirection.xyz);
-  vec3 H = normalize(V + L);
+  vec3 R = reflect(-V, N);
 
   vec3 F0 = vec3(0.04);
   F0 = mix(F0, baseColor.rgb, metallic);
+
+  // Direct lighting
+  vec3 L = normalize(-global.lightDirection.xyz);
+  vec3 H = normalize(V + L);
 
   float NDF = DistributionGGX(N, H, roughness);
   float G = GeometrySmith(N, V, L, roughness);
@@ -124,14 +141,30 @@ void main() {
   kD *= 1.0 - metallic;
 
   float NdotL = max(dot(N, L), 0.0);
-  vec3 diffuse = kD * baseColor.rgb / PI;
-
   vec3 radiance = global.lightColor.rgb * global.lightIntensity;
-  vec3 Lo = (diffuse + specular) * radiance * NdotL;
+  vec3 Lo = (kD * baseColor.rgb / PI + specular) * radiance * NdotL;
 
-  vec3 ambient = vec3(0.03) * baseColor.rgb * ao;
+  // IBL - Ambient lighting (scale down to prevent overexposure)
+  const float IBL_INTENSITY = 0.3;
+
+  vec3 F_ibl = FresnelSchlickRoughness(max(dot(N, V), 0.0), F0, roughness);
+  vec3 kS_ibl = F_ibl;
+  vec3 kD_ibl = 1.0 - kS_ibl;
+  kD_ibl *= 1.0 - metallic;
+
+  vec3 irradiance = texture(irradianceCube, N).rgb;
+  vec3 diffuse_ibl = irradiance * baseColor.rgb;
+
+  vec3 prefilteredColor =
+      textureLod(prefilteredCube, R, roughness * MAX_REFLECTION_LOD).rgb;
+  vec2 brdf = texture(brdfLUT, vec2(max(dot(N, V), 0.0), roughness)).rg;
+  vec3 specular_ibl = prefilteredColor * (F_ibl * brdf.x + brdf.y);
+
+  vec3 ambient = (kD_ibl * diffuse_ibl + specular_ibl) * ao * IBL_INTENSITY;
+
   vec3 color = ambient + Lo + emissive;
 
+  // Tonemap and gamma correct
   color = color / (color + vec3(1.0));
   color = pow(color, vec3(1.0 / 2.2));
 
