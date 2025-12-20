@@ -7,8 +7,6 @@
 #include "rhi/buffer.hpp"
 #include "rhi/descriptor.hpp"
 #include "rhi/pipeline.hpp"
-#include "rhi/swapchain.hpp"
-#include "rhi/sync.hpp"
 #include "rhi/texture.hpp"
 
 namespace rhi {
@@ -161,16 +159,37 @@ class CommandBuffer {
 
   /**
    * @brief Copies data from one buffer to another.
+   *
+   * @param src The source buffer.
+   * @param dst The destination buffer.
+   * @param srcOffset Offset in the source buffer.
+   * @param dstOffset Offset in the destination buffer.
+   * @param size Number of bytes to copy.
    */
   virtual void CopyBuffer(const Buffer* src, Buffer* dst, Size srcOffset,
                           Size dstOffset, Size size) = 0;
 
   /**
    * @brief Copies data from a buffer to a texture.
+   *
+   * @param src The source buffer.
+   * @param dst The destination texture.
+   * @param mipLevel The mip level of the texture to copy to.
+   * @param arrayLayer The array layer of the texture to copy to.
    */
   virtual void CopyBufferToTexture(const Buffer* src, Texture* dst,
                                    uint32_t mipLevel = 0,
                                    uint32_t arrayLayer = 0) = 0;
+
+  /**
+   * @brief Pushes constants to the pipeline.
+   *
+   * @param pipeline The pipeline to push constants to.
+   * @param offset Offset in bytes.
+   * @param data The constant data.
+   */
+  virtual void PushConstants(const Pipeline* pipeline, uint32_t offset,
+                             std::span<const std::byte> data) = 0;
 };
 
 /**
@@ -192,46 +211,5 @@ class CommandPool {
    * @return A pointer to the allocated command buffer.
    */
   [[nodiscard]] virtual CommandBuffer* AllocateCommandBuffer() = 0;
-};
-
-/**
- * @brief Abstract base class for command queues in the rendering hardware
- * interface (RHI).
- */
-class CommandQueue {
- public:
-  virtual ~CommandQueue() = default;
-
-  /**
-   * @brief Submits command buffers to the queue for execution.
-   *
-   * @param commandBuffers The command buffers to submit.
-   * @param waitSemaphores Semaphores to wait on before execution.
-   * @param signalSemaphores Semaphores to signal after execution.
-   * @param fence Optional fence to signal upon completion.
-   */
-  virtual void Submit(std::span<CommandBuffer* const> commandBuffers,
-                      std::span<Semaphore* const> waitSemaphores,
-                      std::span<Semaphore* const> signalSemaphores,
-                      Fence* fence = nullptr) = 0;
-
-  /**
-   * @brief Pushes constants to the pipeline.
-   *
-   * @param pipeline The pipeline to push constants to.
-   * @param offset Offset in bytes.
-   * @param data The constant data.
-   */
-  virtual void PushConstants(const Pipeline* pipeline, uint32_t offset,
-                             std::span<const std::byte> data) = 0;
-
-  /**
-   * @brief Presents the rendered image to the display.
-   *
-   * @param swapchain The swapchain to present to.
-   * @param imageIndex The index of the image to present.
-   */
-  virtual void Present(Swapchain* swapchain, uint32_t imageIndex,
-                       std::span<Semaphore* const> waitSemaphores) = 0;
 };
 }  // namespace rhi

@@ -3,12 +3,12 @@ target_sources(
   PRIVATE
     "main.cpp"
     "window.cpp"
-    "input.cpp"
     "application.cpp"
-    "camera.cpp"
 )
 
-add_subdirectory("vulkan")
-add_subdirectory("rendering")
 add_subdirectory("rhi")
 add_subdirectory("backends")
+add_subdirectory("platform")
+add_subdirectory("input")
+add_subdirectory("event")
+add_subdirectory("camera")

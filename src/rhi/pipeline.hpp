@@ -5,6 +5,15 @@
 
 namespace rhi {
 /**
+ * @brief Describes a push constant range
+ */
+struct PushConstantRange {
+  ShaderStage stage{ShaderStage::Vertex};
+  uint32_t offset{0};
+  uint32_t size{0};
+};
+
+/**
  * @brief Abstract base class for a pipeline layout.
  */
 class PipelineLayout {
@@ -19,6 +28,15 @@ class PipelineLayout {
    */
   [[nodiscard]] virtual auto GetSetLayouts() const
       -> const std::vector<DescriptorSetLayout*>& = 0;
+
+  /**
+   * @brief Get the push constant ranges associated with the pipeline layout.
+   *
+   * @return const std::vector<PushConstantRange>& Reference to the push
+   * constant ranges.
+   */
+  [[nodiscard]] virtual auto GetPushConstantRanges() const
+      -> const std::vector<PushConstantRange>& = 0;
 };
 
 /**

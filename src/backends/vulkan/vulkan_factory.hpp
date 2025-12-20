@@ -27,10 +27,12 @@ class VulkanFactory : public rhi::Factory {
   std::unique_ptr<rhi::DescriptorSet> CreateDescriptorSet(
       const rhi::DescriptorSetLayout* layout) override;
   std::unique_ptr<rhi::PipelineLayout> CreatePipelineLayout(
-      std::span<const rhi::DescriptorSetLayout* const> setLayouts) override;
+      std::span<const rhi::DescriptorSetLayout* const> setLayouts,
+      std::span<const rhi::PushConstantRange> pushConstantRanges = {}) override;
   std::unique_ptr<rhi::Pipeline> CreateGraphicsPipeline(
       const rhi::GraphicsPipelineDesc& desc) override;
-  std::unique_ptr<rhi::CommandPool> CreateCommandPool() override;
+  std::unique_ptr<rhi::CommandPool> CreateCommandPool(
+      rhi::QueueType queueType = rhi::QueueType::Graphics) override;
   std::unique_ptr<rhi::Fence> CreateFence(bool signaled = false) override;
   std::unique_ptr<rhi::Semaphore> CreateSemaphore() override;
   std::unique_ptr<rhi::Swapchain> CreateSwapchain(uint32_t width,
@@ -38,6 +40,6 @@ class VulkanFactory : public rhi::Factory {
                                                   rhi::Format format) override;
 
  private:
-  VulkanContext& context_;
+  VulkanContext& context_;  // NOLINT
 };
 }  // namespace backends::vulkan

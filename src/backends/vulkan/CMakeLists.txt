@@ -1,6 +1,17 @@
 target_sources(
   VkRenderer
   PRIVATE
+    "vulkan_allocator.cpp"
     "vulkan_context.cpp"
     "vulkan_buffer.cpp"
+    "vulkan_sampler.cpp"
+    "vulkan_shader.cpp"
+    "vulkan_fence.cpp"
+    "vulkan_semaphore.cpp"
+    "vulkan_texture.cpp"
+    "vulkan_descriptor.cpp"
+    "vulkan_command.cpp"
+    "vulkan_pipeline.cpp"
+    "vulkan_swapchain.cpp"
+    "vulkan_factory.cpp"
 )

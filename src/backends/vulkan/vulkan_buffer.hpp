@@ -1,5 +1,4 @@
 #pragma once
-#pragma once
 
 #include <memory>
 
@@ -7,6 +6,7 @@
 #include "rhi/buffer.hpp"
 
 namespace backends::vulkan {
+
 class VulkanBuffer : public rhi::Buffer {
  public:
   ~VulkanBuffer() override;
@@ -25,6 +25,8 @@ class VulkanBuffer : public rhi::Buffer {
   [[nodiscard]] rhi::Address GetDeviceAddress() const override {
     return deviceAddress_;
   }
+
+  [[nodiscard]] vk::Buffer GetHandle() const { return buffer_; }
 
  private:
   VulkanBuffer(VulkanAllocator& allocator, vk::Buffer buffer,

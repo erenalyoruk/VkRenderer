@@ -1,34 +1,26 @@
 #include "window.hpp"
 
-#include <cassert>
 #include <span>
 #include <stdexcept>
-#include <vector>
 
 #include "logger.hpp"
 
-namespace {
-void DestroySDLWindow(SDL_Window* window) {
-  if (window != nullptr) {
-    LOG_DEBUG("Destroying SDL window.");
-    SDL_DestroyWindow(window);
+Window::Window(const WindowConfig& config)
+    : window_{nullptr, SDL_DestroyWindow},
+      width_{config.width},
+      height_{config.height} {
+  SDL_WindowFlags flags = 0;
+  if (config.vulkanSupport) {
+    flags |= SDL_WINDOW_VULKAN;
   }
-}
-}  // namespace
-
-Window::Window(int width, int height, const std::string& title)
-    : window_{nullptr, DestroySDLWindow}, width_{width}, height_{height} {
-  if (!SDL_Init(SDL_INIT_VIDEO)) {
-    LOG_CRITICAL("Failed to initialize SDL! SDL_Error: {}", SDL_GetError());
-    throw std::runtime_error{"Failed to initialize SDL."};
+  if (config.resizable) {
+    flags |= SDL_WINDOW_RESIZABLE;
+  }
+  if (config.highDPI) {
+    flags |= SDL_WINDOW_HIGH_PIXEL_DENSITY;
   }
 
-  LOG_DEBUG("SDL initialized.");
-
-  SDL_WindowFlags windowFlags{SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE |
-                              SDL_WINDOW_HIGH_PIXEL_DENSITY};
-
-  window_.reset(SDL_CreateWindow(title.c_str(), width_, height_, windowFlags));
+  window_.reset(SDL_CreateWindow(config.title.c_str(), width_, height_, flags));
   if (window_ == nullptr) {
     LOG_CRITICAL("Failed to create SDL window! SDL_Error: {}", SDL_GetError());
     throw std::runtime_error{"Failed to create SDL window."};
@@ -37,59 +29,30 @@ Window::Window(int width, int height, const std::string& title)
   LOG_DEBUG("SDL window created.");
 }
 
-Window::~Window() {
-  window_.reset();
-
-  SDL_Quit();
-  LOG_DEBUG("SDL terminated.");
-}
+Window::~Window() { window_.reset(); }
 
 Window::Window(Window&& other) noexcept
-    : window_{std::exchange(other.window_, nullptr)},
+    : window_{std::move(other.window_)},
       width_{std::exchange(other.width_, 0)},
       height_{std::exchange(other.height_, 0)},
-      shouldClose_{std::exchange(other.shouldClose_, false)} {}
+      resizeCallbacks_{std::move(other.resizeCallbacks_)} {}
 
 Window& Window::operator=(Window&& other) noexcept {
-  if (this == &other) {
-    return *this;
+  if (this != &other) {
+    window_ = std::move(other.window_);
+    width_ = std::exchange(other.width_, 0);
+    height_ = std::exchange(other.height_, 0);
+    resizeCallbacks_ = std::move(other.resizeCallbacks_);
   }
-
-  window_ = std::exchange(other.window_, nullptr);
-  width_ = std::exchange(other.width_, 0);
-  height_ = std::exchange(other.height_, 0);
-  shouldClose_ = std::exchange(other.shouldClose_, false);
-
   return *this;
 }
 
-void Window::PollEvents() {
-  input_.Update();
-
-  SDL_Event event{};
-  while (SDL_PollEvent(&event)) {
-    input_.ProcessEvent(event);
-
-    switch (event.type) {
-      case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
-        shouldClose_ = true;
-        break;
-      case SDL_EVENT_WINDOW_RESIZED: {
-        width_ = event.window.data1;
-        height_ = event.window.data2;
-        for (const auto& callback : resizeCallback_) {
-          callback(width_, height_);
-        }
-        break;
-      }
-      default:
-        break;
-    }
-  }
+void Window::AddResizeCallback(ResizeCallback callback) {
+  resizeCallbacks_.push_back(std::move(callback));
 }
 
 std::vector<const char*> Window::GetRequiredVulkanExtensions() const {
-  ((void)this);
+  (void)this;
 
   uint32_t count{0};
   const char* const* extensions{SDL_Vulkan_GetInstanceExtensions(&count)};
@@ -106,6 +69,13 @@ std::vector<const char*> Window::GetRequiredVulkanExtensions() const {
 vk::SurfaceKHR Window::CreateSurface(vk::Instance instance) const {
   VkSurfaceKHR surface{};
   SDL_Vulkan_CreateSurface(window_.get(), instance, nullptr, &surface);
-
   return vk::SurfaceKHR{surface};
+}
+
+void Window::NotifyResize(int width, int height) {
+  width_ = width;
+  height_ = height;
+  for (const auto& callback : resizeCallbacks_) {
+    callback(width, height);
+  }
 }

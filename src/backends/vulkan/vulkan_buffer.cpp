@@ -82,11 +82,11 @@ std::unique_ptr<VulkanBuffer> VulkanBuffer::Create(VulkanAllocator& allocator,
 VulkanBuffer::VulkanBuffer(VulkanAllocator& allocator, vk::Buffer buffer,
                            VmaAllocation allocation, rhi::Size size,
                            vk::DeviceAddress deviceAddress)
-    : allocator_(&allocator),
-      buffer_(buffer),
-      allocation_(allocation),
-      size_(size),
-      deviceAddress_(deviceAddress) {}
+    : allocator_{&allocator},
+      buffer_{buffer},
+      allocation_{allocation},
+      size_{size},
+      deviceAddress_{deviceAddress} {}
 
 VulkanBuffer::~VulkanBuffer() {
   if (buffer_ != nullptr && allocator_ != nullptr) {

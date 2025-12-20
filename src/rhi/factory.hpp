@@ -6,6 +6,7 @@
 #include "rhi/command.hpp"
 #include "rhi/descriptor.hpp"
 #include "rhi/pipeline.hpp"
+#include "rhi/queue.hpp"
 #include "rhi/sampler.hpp"
 #include "rhi/swapchain.hpp"
 #include "rhi/sync.hpp"
@@ -90,11 +91,13 @@ class Factory {
    * @brief Creates a pipeline layout.
    *
    * @param setLayouts Descriptor set layouts
+   * @param pushConstantRanges Push constant ranges
    * @return std::unique_ptr<PipelineLayout> Pointer to the created pipeline
    * layout
    */
   virtual std::unique_ptr<PipelineLayout> CreatePipelineLayout(
-      std::span<const DescriptorSetLayout* const> setLayouts) = 0;
+      std::span<const DescriptorSetLayout* const> setLayouts,
+      std::span<const PushConstantRange> pushConstantRanges = {}) = 0;
 
   /**
    * @brief Creates a graphics pipeline.
@@ -108,9 +111,11 @@ class Factory {
   /**
    * @brief Creates a command pool.
    *
+   * @param queueType The type of queue this pool will submit to
    * @return std::unique_ptr<CommandPool> Pointer to the created command pool
    */
-  virtual std::unique_ptr<CommandPool> CreateCommandPool() = 0;
+  virtual std::unique_ptr<CommandPool> CreateCommandPool(
+      QueueType queueType = QueueType::Graphics) = 0;
 
   /**
    * @brief Creates a fence.

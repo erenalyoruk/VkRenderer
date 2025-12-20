@@ -9,10 +9,12 @@ namespace rhi {
  * @brief Usage flags for buffers and textures
  */
 enum class BufferUsage : uint8_t {
-  Vertex = 1 << 0,   // Vertex buffer
-  Index = 1 << 1,    // Index buffer
-  Uniform = 1 << 2,  // Uniform buffer
-  Storage = 1 << 3,  // Storage buffer
+  Vertex = 1 << 0,       // Vertex buffer
+  Index = 1 << 1,        // Index buffer
+  Uniform = 1 << 2,      // Uniform buffer
+  Storage = 1 << 3,      // Storage buffer
+  TransferSrc = 1 << 4,  // Source for transfer operations
+  TransferDst = 1 << 5,  // Destination for transfer operations
 };
 
 constexpr BufferUsage operator&(BufferUsage a, BufferUsage b) {

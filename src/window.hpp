@@ -6,52 +6,49 @@
 #include <vector>
 
 #include <SDL3/SDL.h>
-#include <SDl3/SDL_vulkan.h>
+#include <SDL3/SDL_vulkan.h>
 #include <vulkan/vulkan.hpp>
 
-#include "input.hpp"
+struct WindowConfig {
+  int width{1280};
+  int height{720};
+  std::string title{"VkRenderer"};
+  bool resizable{true};
+  bool highDPI{true};
+  bool vulkanSupport{true};
+};
 
 class Window {
  public:
-  Window(int width, int height, const std::string& title);
+  using ResizeCallback = std::function<void(int, int)>;
+
+  explicit Window(const WindowConfig& config);
   ~Window();
 
   Window(const Window&) = delete;
   Window& operator=(const Window&) = delete;
-
   Window(Window&&) noexcept;
   Window& operator=(Window&&) noexcept;
 
-  void PollEvents();
-
-  void AddOnResize(std::function<void(int, int)> callback) {
-    resizeCallback_.push_back(std::move(callback));
-  }
+  void AddResizeCallback(ResizeCallback callback);
 
   [[nodiscard]] auto GetRequiredVulkanExtensions() const
       -> std::vector<const char*>;
-
   [[nodiscard]] vk::SurfaceKHR CreateSurface(vk::Instance instance) const;
 
-  [[nodiscard]] SDL_Window& GetHandle() const { return *window_; }
-
-  [[nodiscard]] bool ShouldClose() const { return shouldClose_; }
-
-  [[nodiscard]] Input& GetInput() { return input_; }
-
+  [[nodiscard]] SDL_Window* GetHandle() const { return window_.get(); }
   [[nodiscard]] int GetWidth() const { return width_; }
   [[nodiscard]] int GetHeight() const { return height_; }
+  [[nodiscard]] float GetAspectRatio() const {
+    return static_cast<float>(width_) / static_cast<float>(height_);
+  }
+
+  // Internal use by event system
+  void NotifyResize(int width, int height);
 
  private:
-  std::unique_ptr<SDL_Window, decltype(&SDL_DestroyWindow)> window_{
-      nullptr, SDL_DestroyWindow};
-
-  int width_{0};
-  int height_{0};
-
-  bool shouldClose_{false};
-
-  std::vector<std::function<void(int, int)>> resizeCallback_;
-
-  Input input_;
+  std::unique_ptr<SDL_Window, decltype(&SDL_DestroyWindow)> window_;
+  int width_;
+  int height_;
+  std::vector<ResizeCallback> resizeCallbacks_;
 };

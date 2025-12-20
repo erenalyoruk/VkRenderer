@@ -1,9 +1,15 @@
 #include "backends/vulkan/vulkan_context.hpp"
 
+#include <array>
+#include <bit>
 #include <cstdint>
 #include <set>
 #include <vector>
 
+#include "backends/vulkan/vulkan_command.hpp"
+#include "backends/vulkan/vulkan_fence.hpp"
+#include "backends/vulkan/vulkan_semaphore.hpp"
+#include "backends/vulkan/vulkan_swapchain.hpp"
 #include "logger.hpp"
 
 VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
@@ -36,6 +42,73 @@ DebugCallback(vk::DebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
 }  // namespace
 
 namespace backends::vulkan {
+VulkanQueue::VulkanQueue(vk::Queue queue, rhi::QueueType type)
+    : queue_{queue}, type_{type} {}
+
+void VulkanQueue::Submit(std::span<rhi::CommandBuffer* const> commandBuffers,
+                         std::span<rhi::Semaphore* const> waitSemaphores,
+                         std::span<rhi::Semaphore* const> signalSemaphores,
+                         rhi::Fence* fence) {
+  std::vector<vk::CommandBuffer> vkCmdBuffers{};
+  for (auto* cb : commandBuffers) {
+    auto* vkCb{std::bit_cast<VulkanCommandBuffer*>(cb)};
+    vkCmdBuffers.push_back(vkCb->GetCommandBuffer());
+  }
+
+  std::vector<vk::Semaphore> vkWaitSemaphores{};
+  std::vector<vk::PipelineStageFlags> waitStages{};
+  for (auto* sem : waitSemaphores) {
+    auto* vkSem{std::bit_cast<VulkanSemaphore*>(sem)};
+    vkWaitSemaphores.push_back(vkSem->GetSemaphore());
+    waitStages.emplace_back(vk::PipelineStageFlagBits::eColorAttachmentOutput);
+  }
+
+  std::vector<vk::Semaphore> vkSignalSemaphores{};
+  for (auto* sem : signalSemaphores) {
+    auto* vkSem{std::bit_cast<VulkanSemaphore*>(sem)};
+    vkSignalSemaphores.push_back(vkSem->GetSemaphore());
+  }
+
+  vk::SubmitInfo submitInfo{
+      .waitSemaphoreCount = static_cast<uint32_t>(vkWaitSemaphores.size()),
+      .pWaitSemaphores = vkWaitSemaphores.data(),
+      .pWaitDstStageMask = waitStages.data(),
+      .commandBufferCount = static_cast<uint32_t>(vkCmdBuffers.size()),
+      .pCommandBuffers = vkCmdBuffers.data(),
+      .signalSemaphoreCount = static_cast<uint32_t>(vkSignalSemaphores.size()),
+      .pSignalSemaphores = vkSignalSemaphores.data(),
+  };
+
+  vk::Fence vkFence{(fence != nullptr)
+                        ? std::bit_cast<VulkanFence*>(fence)->GetFence()
+                        : VK_NULL_HANDLE};
+  queue_.submit(submitInfo, vkFence);
+}
+
+void VulkanQueue::Present(rhi::Swapchain* swapchain, uint32_t imageIndex,
+                          std::span<rhi::Semaphore* const> waitSemaphores) {
+  std::vector<vk::Semaphore> vkWaitSemaphores;
+  for (auto* sem : waitSemaphores) {
+    vkWaitSemaphores.push_back(
+        std::bit_cast<VulkanSemaphore*>(sem)->GetSemaphore());
+  }
+
+  vk::SwapchainKHR vkSwapchain =
+      std::bit_cast<VulkanSwapchain*>(swapchain)->GetSwapchain();
+  vk::PresentInfoKHR presentInfo{
+      .waitSemaphoreCount = static_cast<uint32_t>(vkWaitSemaphores.size()),
+      .pWaitSemaphores = vkWaitSemaphores.data(),
+      .swapchainCount = 1,
+      .pSwapchains = &vkSwapchain,
+      .pImageIndices = &imageIndex,
+  };
+
+  auto result{queue_.presentKHR(presentInfo)};
+  if (result != vk::Result::eSuccess) {
+    LOG_ERROR("Failed to present swapchain image: {}", vk::to_string(result));
+  }
+}
+
 struct QueueFamilyIndices {
   std::optional<uint32_t> graphicsFamily;
   std::optional<uint32_t> computeFamily;
@@ -48,8 +121,9 @@ struct QueueFamilyIndices {
   }
 };
 
-VulkanContext::VulkanContext(Window& window, bool enableValidationLayers)
-    : enableValidation_(enableValidationLayers) {
+VulkanContext::VulkanContext(class Window& window, uint32_t width,
+                             uint32_t height, bool enableValidationLayers)
+    : enableValidation_{enableValidationLayers} {
   try {
     VULKAN_HPP_DEFAULT_DISPATCHER.init();
 
@@ -66,6 +140,23 @@ VulkanContext::VulkanContext(Window& window, bool enableValidationLayers)
     CreateLogicalDevice();
 
     allocator_ = std::make_unique<VulkanAllocator>(*this);
+    swapchain_ = VulkanSwapchain::Create(*this, width, height,
+                                         rhi::Format::R8G8B8A8Unorm);
+
+    std::array<vk::DescriptorPoolSize, 4> poolSizes{{
+        {.type = vk::DescriptorType::eUniformBuffer, .descriptorCount = 100},
+        {.type = vk::DescriptorType::eStorageBuffer, .descriptorCount = 100},
+        {.type = vk::DescriptorType::eSampledImage, .descriptorCount = 100},
+        {.type = vk::DescriptorType::eSampler, .descriptorCount = 100},
+    }};
+
+    vk::DescriptorPoolCreateInfo poolInfo{
+        .maxSets = 100,
+        .poolSizeCount = static_cast<uint32_t>(poolSizes.size()),
+        .pPoolSizes = poolSizes.data(),
+    };
+
+    descriptorPool_ = device_->createDescriptorPoolUnique(poolInfo);
 
     // Create RHI queues
     queues_.push_back(std::make_unique<VulkanQueue>(graphicsQueue_,
