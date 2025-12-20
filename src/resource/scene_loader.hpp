@@ -2,29 +2,33 @@
 
 #include <entt/entt.hpp>
 
-#include "renderer/material_manager.hpp"
+#include "renderer/bindless_materials.hpp"
 #include "resource/types.hpp"
 
 namespace resource {
-class SceneLoader {
- public:
-  /**
-   * @brief Instantiate a model into the ECS registry.
-   * @param registry The ECS registry
-   * @param model The loaded model
-   * @param materialManager Material manager for creating GPU materials
-   * @param rootTransform Optional root transform for the model
-   * @return Root entity of the instantiated scene
-   */
-  static entt::entity Instantiate(
-      entt::registry& registry, const Model& model,
-      renderer::MaterialManager& materialManager,
-      const ecs::TransformComponent& rootTransform = {});
+/**
+ * @brief Instantiate a loaded model into the ECS registry.
+ *
+ * @param registry The ECS registry to populate
+ * @param model The loaded model data
+ * @param bindlessMaterials Bindless material manager for registering
+ * materials
+ * @return Root entity of the instantiated scene
+ */
+entt::entity InstantiateModel(
+    entt::registry& registry, const Model& model,
+    renderer::BindlessMaterialManager& bindlessMaterials);
 
- private:
-  static entt::entity InstantiateNode(
-      entt::registry& registry, const Model& model,
-      const std::vector<renderer::GPUMaterial*>& gpuMaterials,
-      uint32_t nodeIndex, entt::entity parent);
-};
+/**
+ * @brief Instantiate a node and its children recursively.
+ *
+ * @param registry The ECS registry
+ * @param model The loaded model data
+ * @param materialIndices Material indices for the model
+ * @param nodeIndex Index of the node to instantiate
+ * @param parent Parent entity
+ */
+void InstantiateNode(entt::registry& registry, const Model& model,
+                     const std::vector<uint32_t>& materialIndices,
+                     uint32_t nodeIndex, entt::entity parent);
 }  // namespace resource

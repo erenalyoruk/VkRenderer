@@ -110,34 +110,50 @@ void VulkanDescriptorSet::BindBuffer(uint32_t binding,
   device_.updateDescriptorSets(write, {});
 }
 
-void VulkanDescriptorSet::BindTexture(uint32_t binding,
-                                      const rhi::Texture* texture,
-                                      const rhi::Sampler* sampler) {
-  const auto* vkTexture{std::bit_cast<const VulkanTexture*>(texture)};
-  const auto* vkSampler{(sampler != nullptr)
-                            ? std::bit_cast<const VulkanSampler*>(sampler)
-                            : nullptr};
-
-  vk::DescriptorImageInfo imageInfo{
-      .sampler =
-          (vkSampler != nullptr) ? vkSampler->GetSampler() : VK_NULL_HANDLE,
-      .imageView = vkTexture->GetImageView(),
-      .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal,
+void VulkanDescriptorSet::BindStorageBuffer(uint32_t binding,
+                                            const rhi::Buffer* buffer,
+                                            rhi::Size offset, rhi::Size range) {
+  const auto* vkBuffer{std::bit_cast<const VulkanBuffer*>(buffer)};
+  vk::DescriptorBufferInfo bufferInfo{
+      .buffer = vkBuffer->GetHandle(),
+      .offset = offset,
+      .range = range == 0 ? VK_WHOLE_SIZE : range,
   };
-
-  // Use CombinedImageSampler when sampler is provided, otherwise SampledImage
-  vk::DescriptorType descriptorType =
-      (vkSampler != nullptr) ? vk::DescriptorType::eCombinedImageSampler
-                             : vk::DescriptorType::eSampledImage;
 
   vk::WriteDescriptorSet write{
       .dstSet = set_,
       .dstBinding = binding,
       .descriptorCount = 1,
-      .descriptorType = descriptorType,
-      .pImageInfo = &imageInfo,
+      .descriptorType = vk::DescriptorType::eStorageBuffer,
+      .pBufferInfo = &bufferInfo,
   };
 
   device_.updateDescriptorSets(write, {});
+}
+
+void VulkanDescriptorSet::BindTexture(uint32_t binding,
+                                      const rhi::Texture* texture,
+                                      const rhi::Sampler* sampler,
+                                      uint32_t arrayElement) {
+  const auto* vkTexture = std::bit_cast<const VulkanTexture*>(texture);
+  const auto* vkSampler = std::bit_cast<const VulkanSampler*>(sampler);
+
+  vk::DescriptorImageInfo imageInfo{};
+  imageInfo.imageView = vkTexture->GetImageView();
+  imageInfo.imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
+
+  if (vkSampler != nullptr) {
+    imageInfo.sampler = vkSampler->GetSampler();
+  }
+
+  vk::WriteDescriptorSet write{};
+  write.dstSet = set_;
+  write.dstBinding = binding;
+  write.dstArrayElement = arrayElement;  // Use array element
+  write.descriptorCount = 1;
+  write.descriptorType = vk::DescriptorType::eCombinedImageSampler;
+  write.pImageInfo = &imageInfo;
+
+  device_.updateDescriptorSets(1, &write, 0, nullptr);
 }
 }  // namespace backends::vulkan

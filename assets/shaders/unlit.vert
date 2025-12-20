@@ -8,6 +8,7 @@ layout(location = 4) in vec4 inColor;
 
 layout(location = 0) out vec2 outTexCoord;
 layout(location = 1) out vec4 outColor;
+layout(location = 2) flat out uint outMaterialIndex;
 
 layout(set = 0, binding = 0) uniform GlobalUniforms {
   mat4 viewProjection;
@@ -19,16 +20,27 @@ layout(set = 0, binding = 0) uniform GlobalUniforms {
 }
 global;
 
-layout(push_constant) uniform ObjectUniforms {
+struct ObjectData {
   mat4 model;
   mat4 normalMatrix;
-}
-object;
+  vec4 boundingSphere;
+  uint materialIndex;
+  uint indexCount;
+  uint indexOffset;
+  int vertexOffset;
+};
+
+layout(std430, set = 2, binding = 0) readonly buffer ObjectBuffer {
+  ObjectData objects[];
+};
 
 void main() {
-  vec4 worldPos = object.model * vec4(inPosition, 1.0);
+  ObjectData obj = objects[gl_InstanceIndex];
+
+  vec4 worldPos = obj.model * vec4(inPosition, 1.0);
   gl_Position = global.viewProjection * worldPos;
 
   outTexCoord = inTexCoord;
   outColor = inColor;
+  outMaterialIndex = obj.materialIndex;
 }

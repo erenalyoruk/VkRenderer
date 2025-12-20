@@ -109,6 +109,15 @@ class Factory {
       const GraphicsPipelineDesc& desc) = 0;
 
   /**
+   * @brief Creates a compute pipeline.
+   *
+   * @param desc Compute pipeline description
+   * @return std::unique_ptr<Pipeline> Pointer to the created compute pipeline
+   */
+  virtual std::unique_ptr<Pipeline> CreateComputePipeline(
+      const ComputePipelineDesc& desc) = 0;
+
+  /**
    * @brief Creates a command pool.
    *
    * @param queueType The type of queue this pool will submit to

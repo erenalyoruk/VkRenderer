@@ -33,6 +33,28 @@ enum class Format : uint8_t {
 };
 
 /**
+ * @brief Access flags for memory barriers
+ */
+enum class AccessFlags : uint8_t {
+  None = 0,
+  ShaderRead = 1 << 0,
+  ShaderWrite = 1 << 1,
+  IndirectCommandRead = 1 << 2,
+  TransferRead = 1 << 3,
+  TransferWrite = 1 << 4,
+};
+
+inline AccessFlags operator|(AccessFlags a, AccessFlags b) {
+  return static_cast<AccessFlags>(static_cast<uint8_t>(a) |
+                                  static_cast<uint8_t>(b));
+}
+
+inline AccessFlags operator&(AccessFlags a, AccessFlags b) {
+  return static_cast<AccessFlags>(static_cast<uint8_t>(a) &
+                                  static_cast<uint8_t>(b));
+}
+
+/**
  * @brief Memory usage patterns
  */
 enum class MemoryUsage : uint8_t {

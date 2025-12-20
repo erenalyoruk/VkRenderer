@@ -5,7 +5,8 @@
 
 #include <glm/glm.hpp>
 
-#include "renderer/material_manager.hpp"
+#include "renderer/bindless_materials.hpp"
+#include "renderer/gpu_culling.hpp"
 #include "renderer/pipeline_manager.hpp"
 #include "rhi/buffer.hpp"
 #include "rhi/command.hpp"
@@ -13,7 +14,6 @@
 #include "rhi/device.hpp"
 #include "rhi/factory.hpp"
 #include "rhi/pipeline.hpp"
-#include "rhi/sampler.hpp"
 #include "rhi/sync.hpp"
 
 namespace renderer {
@@ -28,30 +28,11 @@ struct GlobalUniforms {
   alignas(4) float time;
 };
 
-struct ObjectUniforms {
-  alignas(16) glm::mat4 model;
-  alignas(16) glm::mat4 normalMatrix;
-};
-
-struct MaterialUniforms {
-  alignas(16) glm::vec4 baseColor;
-  alignas(4) float metallic;
-  alignas(4) float roughness;
-};
-
 struct FrameData {
-  // Synchronization - per frame in flight
   std::unique_ptr<rhi::Fence> inFlightFence;
-
-  // Command buffers
   std::unique_ptr<rhi::CommandPool> commandPool;
   rhi::CommandBuffer* commandBuffer{nullptr};
-
-  // Uniform buffers
   std::unique_ptr<rhi::Buffer> globalUniformBuffer;
-  std::unique_ptr<rhi::Buffer> objectUniformBuffer;
-
-  // Descriptor sets
   std::unique_ptr<rhi::DescriptorSet> globalDescriptorSet;
 };
 
@@ -67,7 +48,6 @@ class RenderContext {
   }
   [[nodiscard]] uint32_t GetFrameIndex() const { return currentFrame_; }
 
-  // Get semaphores indexed by swapchain image
   [[nodiscard]] rhi::Semaphore* GetImageAvailableSemaphore(
       uint32_t imageIndex) {
     return imageAvailableSemaphores_[imageIndex].get();
@@ -77,11 +57,9 @@ class RenderContext {
     return renderFinishedSemaphores_[imageIndex].get();
   }
 
-  // Resource access
   [[nodiscard]] rhi::Device& GetDevice() { return device_; }
   [[nodiscard]] rhi::Factory& GetFactory() { return factory_; }
 
-  // Pipeline access through PipelineManager
   [[nodiscard]] PipelineManager& GetPipelineManager() {
     return pipelineManager_;
   }
@@ -92,8 +70,6 @@ class RenderContext {
     return pipelineManager_.GetPipelineLayout();
   }
 
-  [[nodiscard]] rhi::Sampler& GetDefaultSampler() { return *defaultSampler_; }
-
   [[nodiscard]] rhi::Texture* GetDepthTexture() const {
     return depthTexture_.get();
   }
@@ -101,12 +77,13 @@ class RenderContext {
   [[nodiscard]] rhi::DescriptorSetLayout* GetGlobalDescriptorLayout() {
     return globalDescriptorLayout_.get();
   }
-  [[nodiscard]] rhi::DescriptorSetLayout* GetMaterialDescriptorLayout() {
-    return materialDescriptorLayout_.get();
-  }
 
-  [[nodiscard]] MaterialManager& GetMaterialManager() {
-    return materialManager_;
+  // GPU Culling
+  [[nodiscard]] GPUCulling& GetGPUCulling() { return *gpuCulling_; }
+
+  // Bindless Materials
+  [[nodiscard]] BindlessMaterialManager& GetBindlessMaterials() {
+    return *bindlessMaterials_;
   }
 
   void UpdateGlobalUniforms(const GlobalUniforms& uniforms);
@@ -124,22 +101,18 @@ class RenderContext {
   std::array<FrameData, kMaxFramesInFlight> frames_;
   uint32_t currentFrame_{0};
 
-  // Semaphores per swapchain image
   std::vector<std::unique_ptr<rhi::Semaphore>> imageAvailableSemaphores_;
   std::vector<std::unique_ptr<rhi::Semaphore>> renderFinishedSemaphores_;
 
-  // Descriptor layouts
   std::unique_ptr<rhi::DescriptorSetLayout> globalDescriptorLayout_;
-  std::unique_ptr<rhi::DescriptorSetLayout> materialDescriptorLayout_;
 
-  // Pipeline management
+  // GPU Systems
+  std::unique_ptr<GPUCulling> gpuCulling_;
+  std::unique_ptr<BindlessMaterialManager> bindlessMaterials_;
+
   PipelineManager pipelineManager_;
 
-  // Material management
-  MaterialManager materialManager_;
-
-  // Shared resources
-  std::unique_ptr<rhi::Sampler> defaultSampler_;
   std::shared_ptr<rhi::Texture> depthTexture_;
 };
+
 }  // namespace renderer

@@ -34,7 +34,8 @@ class PipelineManager {
   PipelineManager(rhi::Factory& factory, rhi::Device& device);
 
   void Initialize(rhi::DescriptorSetLayout* globalLayout,
-                  rhi::DescriptorSetLayout* materialLayout);
+                  rhi::DescriptorSetLayout* materialLayout,
+                  rhi::DescriptorSetLayout* objectLayout = nullptr);
 
   [[nodiscard]] rhi::Pipeline* GetPipeline(PipelineType type);
   [[nodiscard]] rhi::PipelineLayout* GetPipelineLayout() {
@@ -54,6 +55,7 @@ class PipelineManager {
 
   rhi::DescriptorSetLayout* globalLayout_{nullptr};
   rhi::DescriptorSetLayout* materialLayout_{nullptr};
+  rhi::DescriptorSetLayout* objectLayout_{nullptr};
 };
 
 }  // namespace renderer

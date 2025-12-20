@@ -13,8 +13,9 @@ enum class BufferUsage : uint8_t {
   Index = 1 << 1,        // Index buffer
   Uniform = 1 << 2,      // Uniform buffer
   Storage = 1 << 3,      // Storage buffer
-  TransferSrc = 1 << 4,  // Source for transfer operations
-  TransferDst = 1 << 5,  // Destination for transfer operations
+  Indirect = 1 << 4,     // Indirect buffer
+  TransferSrc = 1 << 5,  // Source for transfer operations
+  TransferDst = 1 << 6,  // Destination for transfer operations
 };
 
 constexpr BufferUsage operator&(BufferUsage a, BufferUsage b) {

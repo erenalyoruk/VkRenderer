@@ -12,15 +12,21 @@ PipelineManager::PipelineManager(rhi::Factory& factory, rhi::Device& device)
     : factory_{factory}, device_{device} {}
 
 void PipelineManager::Initialize(rhi::DescriptorSetLayout* globalLayout,
-                                 rhi::DescriptorSetLayout* materialLayout) {
+                                 rhi::DescriptorSetLayout* materialLayout,
+                                 rhi::DescriptorSetLayout* objectLayout) {
   globalLayout_ = globalLayout;
   materialLayout_ = materialLayout;
+  objectLayout_ = objectLayout;
 
-  // Create pipeline layout
-  std::array<rhi::DescriptorSetLayout*, 2> layouts = {
-      globalLayout_,
-      materialLayout_,
+  // Create pipeline layout - only include object layout if provided
+  std::vector<rhi::DescriptorSetLayout*> layouts = {
+      globalLayout_,   // set 0
+      materialLayout_  // set 1
   };
+
+  if (objectLayout_ != nullptr) {
+    layouts.push_back(objectLayout_);  // set 2
+  }
 
   std::array<rhi::PushConstantRange, 1> pushConstants = {{
       {.stage = rhi::ShaderStage::Vertex, .offset = 0, .size = 128},  // 2x mat4
@@ -104,7 +110,7 @@ rhi::Pipeline* PipelineManager::GetPipeline(PipelineType type) {
 
 void PipelineManager::RecreatePipelines() {
   pipelines_.clear();
-  Initialize(globalLayout_, materialLayout_);
+  Initialize(globalLayout_, materialLayout_, objectLayout_);
 }
 
 }  // namespace renderer

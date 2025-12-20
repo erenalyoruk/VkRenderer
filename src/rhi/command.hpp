@@ -167,6 +167,64 @@ class CommandBuffer {
                            uint32_t firstInstance) = 0;
 
   /**
+   * @brief Issues an indirect indexed draw command.
+   *
+   * @param buffer Buffer containing draw parameters.
+   * @param offset Offset into the buffer.
+   * @param drawCount Number of draws to execute.
+   * @param stride Stride between draw commands in the buffer.
+   */
+  virtual void DrawIndexedIndirect(const Buffer* buffer, Size offset,
+                                   uint32_t drawCount, uint32_t stride) = 0;
+
+  /**
+   * @brief Issues an indirect indexed draw command with GPU-driven count.
+   *
+   * @param commandBuffer Buffer containing draw parameters.
+   * @param commandOffset Offset into the command buffer.
+   * @param countBuffer Buffer containing the draw count.
+   * @param countOffset Offset into the count buffer.
+   * @param maxDrawCount Maximum number of draws to execute.
+   * @param stride Stride between draw commands in the command buffer.
+   */
+  virtual void DrawIndexedIndirectCount(const Buffer* commandBuffer,
+                                        Size commandOffset,
+                                        const Buffer* countBuffer,
+                                        Size countOffset, uint32_t maxDrawCount,
+                                        uint32_t stride) = 0;
+
+  /**
+   * @brief Dispatches a compute shader.
+   *
+   * @param groupCountX Number of workgroups in X dimension.
+   * @param groupCountY Number of workgroups in Y dimension.
+   * @param groupCountZ Number of workgroups in Z dimension.
+   */
+  virtual void Dispatch(uint32_t groupCountX, uint32_t groupCountY,
+                        uint32_t groupCountZ) = 0;
+
+  /**
+   * @brief Inserts a memory barrier for buffer access.
+   *
+   * @param buffer The buffer to synchronize.
+   * @param srcAccess Source access flags.
+   * @param dstAccess Destination access flags.
+   */
+  virtual void BufferBarrier(const Buffer* buffer, AccessFlags srcAccess,
+                             AccessFlags dstAccess) = 0;
+
+  /**
+   * @brief Fills a buffer with a 32-bit value.
+   *
+   * @param buffer The buffer to fill.
+   * @param offset Offset in the buffer to start filling.
+   * @param size Number of bytes to fill.
+   * @param value The 32-bit value to fill with.
+   */
+  virtual void FillBuffer(Buffer* buffer, Size offset, Size size,
+                          uint32_t value) = 0;
+
+  /**
    * @brief Transitions a texture to a new layout.
    *
    * @param texture The texture to transition.

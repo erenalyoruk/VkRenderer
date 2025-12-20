@@ -39,8 +39,12 @@ class VulkanDescriptorSet : public rhi::DescriptorSet {
 
   void BindBuffer(uint32_t binding, const rhi::Buffer* buffer,
                   rhi::Size offset = 0, rhi::Size range = 0) override;
+
+  void BindStorageBuffer(uint32_t binding, const rhi::Buffer* buffer,
+                         rhi::Size offset = 0, rhi::Size range = 0) override;
+
   void BindTexture(uint32_t binding, const rhi::Texture* texture,
-                   const rhi::Sampler* sampler = nullptr) override;
+                   const rhi::Sampler* sampler, uint32_t arrayElement) override;
 
   [[nodiscard]] vk::DescriptorSet GetSet() const { return set_; }
 

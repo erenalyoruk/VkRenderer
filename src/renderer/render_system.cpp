@@ -1,60 +1,56 @@
 #include "renderer/render_system.hpp"
 
-#include <bit>
+#include <unordered_set>
 
 namespace renderer {
 
 RenderSystem::RenderSystem(rhi::Device& device, rhi::Factory& factory)
-    : device_{device}, context_{device, factory} {}
+    : device_{device}, factory_{factory}, context_{device, factory} {}
 
 void RenderSystem::Render(entt::registry& registry, float deltaTime) {
-  stats_ = {};
-
   auto* swapchain = device_.GetSwapchain();
 
-  // Skip rendering when window is minimized (0x0 dimensions)
   if (swapchain->GetWidth() == 0 || swapchain->GetHeight() == 0) {
     return;
   }
 
-  // Try to acquire image BEFORE beginning frame
-  // This way if it fails, we haven't reset the fence yet
   uint32_t semaphoreIndex = frameCounter_ % swapchain->GetImageCount();
   auto* imageAvailableSem = context_.GetImageAvailableSemaphore(semaphoreIndex);
 
   uint32_t imageIndex = swapchain->AcquireNextImage(imageAvailableSem);
 
-  // Handle swapchain out of date (resize needed)
   if (imageIndex == UINT32_MAX) {
-    // Don't begin frame, just return - resize callback will handle recreation
     return;
   }
 
-  // Now we know we have a valid image, begin frame (waits for fence, resets
-  // command pool)
   context_.BeginFrame(frameCounter_);
 
   auto& frame = context_.GetCurrentFrame();
-
-  // Use semaphore indexed by acquired image for rendering/present
   auto* renderFinishedSem = context_.GetRenderFinishedSemaphore(imageIndex);
 
-  // Update systems
   UpdateTransforms(registry);
 
   // Find active camera
   auto cameraView = registry.view<ecs::CameraComponent, ecs::MainCameraTag>();
+  glm::mat4 viewProjection{1.0F};
   bool hasCamera = false;
+  glm::vec3 cameraPosition{0.0F};
+
   for (auto entity : cameraView) {
     activeCamera_ = &cameraView.get<ecs::CameraComponent>(entity);
     hasCamera = true;
+
+    // Extract camera position from inverse view matrix
+    glm::mat4 invView = glm::inverse(activeCamera_->view);
+    cameraPosition = glm::vec3(invView[3]);  // Translation column
     break;
   }
 
-  // Update global uniforms if we have a camera
   if (hasCamera) {
     GlobalUniforms globals{};
-    globals.viewProjection = activeCamera_->projection * activeCamera_->view;
+    viewProjection = activeCamera_->projection * activeCamera_->view;
+    globals.viewProjection = viewProjection;
+    globals.cameraPosition = glm::vec4(cameraPosition, 1.0F);
     globals.time = totalTime_;
     totalTime_ += deltaTime;
 
@@ -70,10 +66,18 @@ void RenderSystem::Render(entt::registry& registry, float deltaTime) {
     context_.UpdateGlobalUniforms(globals);
   }
 
-  // Record commands
-  ExecuteRendering(registry, imageIndex);
+  // Build object data and run GPU culling
+  if (hasCamera) {
+    BuildObjectDataForCulling(registry);
+    context_.GetGPUCulling().UpdateFrustum(viewProjection);
+  }
 
-  // Submit
+  // Update material buffer if needed
+  context_.GetBindlessMaterials().UpdateMaterialBuffer();
+
+  // Execute GPU-driven rendering
+  ExecuteGPUDrivenRendering(registry, imageIndex);
+
   auto* cmd = frame.commandBuffer;
   cmd->End();
 
@@ -86,7 +90,6 @@ void RenderSystem::Render(entt::registry& registry, float deltaTime) {
   queue->Submit(cmdBuffers, waitSemaphores, signalSemaphores,
                 frame.inFlightFence.get());
 
-  // Present
   std::array<rhi::Semaphore*, 1> presentWait = {renderFinishedSem};
   queue->Present(swapchain, imageIndex, presentWait);
 
@@ -94,7 +97,8 @@ void RenderSystem::Render(entt::registry& registry, float deltaTime) {
 }
 
 void RenderSystem::UpdateTransforms(entt::registry& registry) {
-  // First, update root transforms (no parent)
+  (void)this;
+
   auto rootView =
       registry.view<ecs::TransformComponent, ecs::WorldTransformComponent>(
           entt::exclude<ecs::HierarchyComponent>);
@@ -103,10 +107,8 @@ void RenderSystem::UpdateTransforms(entt::registry& registry) {
     auto& local = rootView.get<ecs::TransformComponent>(entity);
     auto& world = rootView.get<ecs::WorldTransformComponent>(entity);
     world.matrix = local.GetMatrix();
-    stats_.entitiesProcessed++;
   }
 
-  // Then update children with parent hierarchy
   auto childView =
       registry.view<ecs::TransformComponent, ecs::WorldTransformComponent,
                     ecs::HierarchyComponent>();
@@ -124,16 +126,49 @@ void RenderSystem::UpdateTransforms(entt::registry& registry) {
     } else {
       world.matrix = local.GetMatrix();
     }
-    stats_.entitiesProcessed++;
   }
 }
 
-void RenderSystem::FrustumCull(entt::registry& /*registry*/) {}
+void RenderSystem::BuildObjectDataForCulling(entt::registry& registry) {
+  objectDataCache_.clear();
 
-void RenderSystem::SortRenderables(entt::registry& /*registry*/) {}
+  auto view =
+      registry.view<ecs::MeshComponent, ecs::WorldTransformComponent,
+                    ecs::RenderableComponent, ecs::BoundingBoxComponent>();
 
-void RenderSystem::ExecuteRendering(entt::registry& registry,
-                                    uint32_t imageIndex) {
+  for (auto entity : view) {
+    auto& mesh = view.get<ecs::MeshComponent>(entity);
+    auto& world = view.get<ecs::WorldTransformComponent>(entity);
+    auto& bounds = view.get<ecs::BoundingBoxComponent>(entity);
+
+    if (!mesh.vertexBuffer || !mesh.indexBuffer) {
+      continue;
+    }
+
+    glm::vec3 center = bounds.GetCenter();
+    glm::vec3 extents = bounds.GetExtents();
+    float radius = glm::length(extents);
+
+    for (const auto& submesh : mesh.subMeshes) {
+      ObjectData objData{};
+      objData.model = world.matrix;
+      objData.normalMatrix = glm::transpose(glm::inverse(world.matrix));
+      objData.boundingSphere = glm::vec4(center, radius);
+      objData.materialIndex =
+          submesh.materialIndex;  // Now references bindless material
+      objData.indexCount = submesh.indexCount;
+      objData.indexOffset = submesh.indexOffset;
+      objData.vertexOffset = static_cast<int32_t>(submesh.vertexOffset);
+
+      objectDataCache_.push_back(objData);
+    }
+  }
+
+  context_.GetGPUCulling().UpdateObjects(objectDataCache_);
+}
+
+void RenderSystem::ExecuteGPUDrivenRendering(entt::registry& registry,
+                                             uint32_t imageIndex) {
   auto& frame = context_.GetCurrentFrame();
   auto* cmd = frame.commandBuffer;
 
@@ -144,17 +179,16 @@ void RenderSystem::ExecuteRendering(entt::registry& registry,
 
   cmd->Begin();
 
+  // Reset draw count and execute GPU culling
+  context_.GetGPUCulling().ResetDrawCount(cmd);
+  context_.GetGPUCulling().Execute(cmd);
+
   cmd->TransitionTexture(swapchainImage, rhi::ImageLayout::Undefined,
                          rhi::ImageLayout::ColorAttachment);
-
   cmd->TransitionTexture(depthTexture, rhi::ImageLayout::Undefined,
                          rhi::ImageLayout::DepthStencilAttachment);
 
-  // Different clear colors for different modes
   glm::vec4 clearColor{0.1F, 0.1F, 0.15F, 1.0F};
-  if (activePipeline_ == PipelineType::Wireframe) {
-    clearColor = glm::vec4{0.02F, 0.02F, 0.05F, 1.0F};
-  }
 
   rhi::RenderingAttachment colorAttachment{
       .texture = swapchainImage,
@@ -185,54 +219,51 @@ void RenderSystem::ExecuteRendering(entt::registry& registry,
                    static_cast<float>(swapchain->GetHeight()), 0.0F, 1.0F);
   cmd->SetScissor(0, 0, swapchain->GetWidth(), swapchain->GetHeight());
 
-  // Get the active pipeline
   auto* pipeline = context_.GetPipeline(activePipeline_);
-
-  // Fallback chain if pipeline not available
-  if (pipeline == nullptr && activePipeline_ != PipelineType::PBRLit) {
+  if (pipeline == nullptr) {
     pipeline = context_.GetPipeline(PipelineType::PBRLit);
   }
-  if (pipeline == nullptr) {
-    pipeline = context_.GetPipeline(PipelineType::Unlit);
-  }
 
-  // Get default material for fallback
-  auto* defaultMaterial = context_.GetMaterialManager().GetDefaultMaterial();
-
-  if (pipeline != nullptr) {
+  if (pipeline != nullptr && context_.GetGPUCulling().GetObjectCount() > 0) {
     cmd->BindPipeline(pipeline);
 
-    // Bind global descriptor set (set 0)
+    // Bind descriptor sets:
+    // Set 0: Global uniforms
     std::array<const rhi::DescriptorSet*, 1> globalSets = {
         frame.globalDescriptorSet.get()};
     cmd->BindDescriptorSets(pipeline, 0, globalSets);
 
-    auto view = registry.view<ecs::MeshComponent, ecs::WorldTransformComponent,
-                              ecs::RenderableComponent>();
+    // Set 1: Bindless materials
+    std::array<const rhi::DescriptorSet*, 1> materialSets = {
+        context_.GetBindlessMaterials().GetDescriptorSet()};
+    cmd->BindDescriptorSets(pipeline, 1, materialSets);
+
+    // Set 2: Object data SSBO
+    std::array<const rhi::DescriptorSet*, 1> objectSets = {
+        context_.GetGPUCulling().GetObjectDescriptorSet()};
+    cmd->BindDescriptorSets(pipeline, 2, objectSets);
+
+    // Bind mesh buffers and issue indirect draw
+    auto view = registry.view<ecs::MeshComponent>();
+    std::unordered_set<rhi::Buffer*> processedBuffers;
+
+    // Calculate approximate triangles from object data
+    uint32_t totalTriangles = 0;
+    for (const auto& objData : objectDataCache_) {
+      totalTriangles += objData.indexCount / 3;
+    }
 
     for (auto entity : view) {
       auto& mesh = view.get<ecs::MeshComponent>(entity);
-      auto& world = view.get<ecs::WorldTransformComponent>(entity);
 
       if (!mesh.vertexBuffer || !mesh.indexBuffer) {
         continue;
       }
 
-      // Get material component if exists
-      ecs::MaterialComponent* matComp = nullptr;
-      if (registry.all_of<ecs::MaterialComponent>(entity)) {
-        matComp = &registry.get<ecs::MaterialComponent>(entity);
+      if (processedBuffers.contains(mesh.vertexBuffer.get())) {
+        continue;
       }
-
-      ObjectUniforms objUniforms{};
-      objUniforms.model = world.matrix;
-      objUniforms.normalMatrix =
-          glm::transpose(glm::inverse(glm::mat4(glm::mat3(world.matrix))));
-
-      std::span<const std::byte> pushData{
-          std::bit_cast<const std::byte*>(&objUniforms),
-          sizeof(ObjectUniforms)};
-      cmd->PushConstants(pipeline, 0, pushData);
+      processedBuffers.insert(mesh.vertexBuffer.get());
 
       std::array<const rhi::Buffer*, 1> vertexBuffers = {
           mesh.vertexBuffer.get()};
@@ -240,29 +271,12 @@ void RenderSystem::ExecuteRendering(entt::registry& registry,
       cmd->BindVertexBuffers(0, vertexBuffers, offsets);
       cmd->BindIndexBuffer(*mesh.indexBuffer, 0, true);
 
-      for (const auto& submesh : mesh.subMeshes) {
-        // Bind material descriptor set (set 1) per submesh
-        GPUMaterial* gpuMat = defaultMaterial;
-
-        if (matComp != nullptr && !matComp->gpuMaterials.empty()) {
-          uint32_t matIdx = submesh.materialIndex;
-          if (matIdx < matComp->gpuMaterials.size() &&
-              matComp->gpuMaterials[matIdx] != nullptr) {
-            gpuMat = matComp->gpuMaterials[matIdx];
-          }
-        }
-
-        if (gpuMat != nullptr && gpuMat->descriptorSet) {
-          std::array<const rhi::DescriptorSet*, 1> materialSets = {
-              gpuMat->descriptorSet.get()};
-          cmd->BindDescriptorSets(pipeline, 1, materialSets);
-        }
-
-        cmd->DrawIndexed(submesh.indexCount, 1, submesh.indexOffset,
-                         static_cast<int32_t>(submesh.vertexOffset), 0);
-        stats_.drawCalls++;
-        stats_.triangles += submesh.indexCount / 3;
-      }
+      // Single indirect draw with count from GPU
+      cmd->DrawIndexedIndirectCount(
+          context_.GetGPUCulling().GetDrawCommandBuffer(), 0,
+          context_.GetGPUCulling().GetDrawCountBuffer(), 0,
+          context_.GetGPUCulling().GetMaxDrawCount(),
+          sizeof(DrawIndexedIndirectCommand));
     }
   }
 

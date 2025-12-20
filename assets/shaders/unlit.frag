@@ -1,42 +1,47 @@
 #version 450
+#extension GL_EXT_nonuniform_qualifier : require
 
 layout(location = 0) in vec2 inTexCoord;
 layout(location = 1) in vec4 inColor;
+layout(location = 2) flat in uint inMaterialIndex;
 
 layout(location = 0) out vec4 outColor;
 
-layout(set = 1, binding = 0) uniform MaterialUniforms {
+struct MaterialData {
   vec4 baseColorFactor;
-  vec3 emissiveFactor;
-  float metallicFactor;
-  float roughnessFactor;
-  float alphaCutoff;
-  float occlusionStrength;
-  float _padding;
-}
-material;
+  vec4 emissiveFactorAndMetallic;
+  vec4 roughnessAlphaCutoffOcclusion;
+  uint baseColorTexIdx;
+  uint normalTexIdx;
+  uint metallicRoughnessTexIdx;
+  uint occlusionTexIdx;
+  uint emissiveTexIdx;
+  uint _padding[3];
+};
 
-layout(set = 1, binding = 1) uniform sampler2D baseColorTex;
-layout(set = 1, binding = 2) uniform sampler2D normalTex;             // unused
-layout(set = 1, binding = 3) uniform sampler2D metallicRoughnessTex;  // unused
-layout(set = 1, binding = 4) uniform sampler2D occlusionTex;          // unused
-layout(set = 1, binding = 5) uniform sampler2D emissiveTex;
+layout(std430, set = 1, binding = 0) readonly buffer MaterialBuffer {
+  MaterialData materials[];
+};
+
+layout(set = 1, binding = 1) uniform sampler2D textures[];
 
 void main() {
-  vec4 texColor = texture(baseColorTex, inTexCoord);
-  vec4 finalColor = texColor * material.baseColorFactor * inColor;
+  MaterialData mat = materials[inMaterialIndex];
 
-  // Alpha cutoff
-  if (finalColor.a < material.alphaCutoff) {
+  vec4 texColor =
+      texture(textures[nonuniformEXT(mat.baseColorTexIdx)], inTexCoord);
+  vec4 finalColor = texColor * mat.baseColorFactor * inColor;
+
+  float alphaCutoff = mat.roughnessAlphaCutoffOcclusion.y;
+  if (finalColor.a < alphaCutoff) {
     discard;
   }
 
-  // Add emissive
   vec3 emissive =
-      texture(emissiveTex, inTexCoord).rgb * material.emissiveFactor;
+      texture(textures[nonuniformEXT(mat.emissiveTexIdx)], inTexCoord).rgb *
+      mat.emissiveFactorAndMetallic.xyz;
   finalColor.rgb += emissive;
 
-  // Gamma correction
   finalColor.rgb = pow(finalColor.rgb, vec3(1.0 / 2.2));
 
   outColor = finalColor;

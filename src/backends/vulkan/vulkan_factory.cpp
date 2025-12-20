@@ -59,6 +59,11 @@ std::unique_ptr<rhi::Pipeline> VulkanFactory::CreateGraphicsPipeline(
   return VulkanPipeline::Create(context_, desc);
 }
 
+std::unique_ptr<rhi::Pipeline> VulkanFactory::CreateComputePipeline(
+    const rhi::ComputePipelineDesc& desc) {
+  return VulkanPipeline::CreateCompute(context_, desc);
+}
+
 std::unique_ptr<rhi::CommandPool> VulkanFactory::CreateCommandPool(
     rhi::QueueType queueType) {
   return VulkanCommandPool::Create(context_, queueType);

@@ -44,6 +44,9 @@ class VulkanPipeline : public rhi::Pipeline {
   static std::unique_ptr<VulkanPipeline> Create(
       VulkanContext& context, const rhi::GraphicsPipelineDesc& desc);
 
+  static std::unique_ptr<VulkanPipeline> CreateCompute(
+      VulkanContext& context, const rhi::ComputePipelineDesc& desc);
+
   [[nodiscard]] const rhi::PipelineLayout& GetLayout() const override {
     return *layout_;
   }

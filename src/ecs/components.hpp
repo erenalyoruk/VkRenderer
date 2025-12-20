@@ -122,11 +122,8 @@ struct PBRMaterial {
 };
 
 struct MaterialComponent {
-  std::shared_ptr<PBRMaterial> material;
-  std::shared_ptr<rhi::DescriptorSet> descriptorSet;
-
-  // GPU materials for each submesh (indexed by materialIndex in SubMesh)
-  std::vector<renderer::GPUMaterial*> gpuMaterials;
+  // Bindless material indices (one per submesh)
+  std::vector<uint32_t> materialIndices;
 };
 
 // ============================================================================

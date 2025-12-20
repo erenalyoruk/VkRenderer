@@ -69,14 +69,27 @@ class DescriptorSet {
                           Size offset = 0, Size range = 0) = 0;
 
   /**
+   * @brief Binds a storage buffer to a descriptor set.
+   *
+   * @param binding Binding index to bind the storage buffer to.
+   * @param buffer Pointer to the storage buffer to bind.
+   * @param offset Offset within the buffer to start binding from.
+   * @param range Range of the buffer to bind. If 0, binds to the end of the
+   */
+  virtual void BindStorageBuffer(uint32_t binding, const Buffer* buffer,
+                                 Size offset = 0, Size range = 0) = 0;
+
+  /**
    * @brief Binds a texture (and optional sampler) to a specific binding point
    * in the descriptor set.
    *
    * @param binding Binding index to bind the texture to.
    * @param texture Pointer to the texture to bind.
    * @param sampler Optional pointer to the sampler to bind.
+   * @param arrayElement Array element index for descriptor arrays (default 0).
    */
   virtual void BindTexture(uint32_t binding, const Texture* texture,
-                           const Sampler* sampler = nullptr) = 0;
+                           const Sampler* sampler = nullptr,
+                           uint32_t arrayElement = 0) = 0;
 };
 }  // namespace rhi

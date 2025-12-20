@@ -103,6 +103,14 @@ struct GraphicsPipelineDesc {
 };
 
 /**
+ * @brief Structure describing the configuration of a compute pipeline.
+ */
+struct ComputePipelineDesc {
+  const Shader* computeShader{nullptr};
+  const PipelineLayout* layout{nullptr};
+};
+
+/**
  * @brief Abstract base class for a rendering pipeline.
  */
 class Pipeline {

@@ -287,6 +287,39 @@ std::unique_ptr<VulkanPipeline> VulkanPipeline::Create(
       new VulkanPipeline(std::move(layout), std::move(result.value), true));
 }
 
+std::unique_ptr<VulkanPipeline> VulkanPipeline::CreateCompute(
+    VulkanContext& context, const rhi::ComputePipelineDesc& desc) {
+  const auto* vkLayout =
+      std::bit_cast<const VulkanPipelineLayout*>(desc.layout);
+  const auto* vkShader = std::bit_cast<const VulkanShader*>(desc.computeShader);
+
+  vk::PipelineShaderStageCreateInfo shaderStage{
+      .stage = vk::ShaderStageFlagBits::eCompute,
+      .module = vkShader->GetShaderModule(),
+      .pName = "main",
+  };
+
+  vk::ComputePipelineCreateInfo pipelineInfo{
+      .stage = shaderStage,
+      .layout = vkLayout->GetLayout(),
+  };
+
+  auto result =
+      context.GetDevice().createComputePipelineUnique(nullptr, pipelineInfo);
+  if (result.result != vk::Result::eSuccess) {
+    return nullptr;
+  }
+
+  // Copy the layout with its push constant ranges
+  std::span<const rhi::DescriptorSetLayout* const> setLayouts{
+      vkLayout->GetSetLayouts().data(), vkLayout->GetSetLayouts().size()};
+  auto layout = VulkanPipelineLayout::Create(context, setLayouts,
+                                             vkLayout->GetPushConstantRanges());
+
+  return std::unique_ptr<VulkanPipeline>(
+      new VulkanPipeline(std::move(layout), std::move(result.value), false));
+}
+
 VulkanPipeline::VulkanPipeline(std::unique_ptr<VulkanPipelineLayout> layout,
                                vk::UniquePipeline pipeline, bool isGraphics)
     : layout_{std::move(layout)},

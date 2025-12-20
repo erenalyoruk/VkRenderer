@@ -7,27 +7,31 @@ std::unique_ptr<VulkanBuffer> VulkanBuffer::Create(VulkanAllocator& allocator,
                                                    rhi::Size size,
                                                    rhi::BufferUsage usage,
                                                    rhi::MemoryUsage memUsage) {
-  vk::BufferUsageFlags vkUsage{};
   VmaMemoryUsage vmaUsage{};
   VmaAllocationCreateFlags vmaFlags{};
 
-  // Map RHI BufferUsage to Vulkan BufferUsageFlags
-  if ((usage & rhi::BufferUsage::Vertex) != rhi::BufferUsage{0}) {
+  vk::BufferUsageFlags vkUsage{};
+  if ((usage & rhi::BufferUsage::Vertex) != rhi::BufferUsage{}) {
     vkUsage |= vk::BufferUsageFlagBits::eVertexBuffer;
   }
-  if ((usage & rhi::BufferUsage::Index) != rhi::BufferUsage{0}) {
+  if ((usage & rhi::BufferUsage::Index) != rhi::BufferUsage{}) {
     vkUsage |= vk::BufferUsageFlagBits::eIndexBuffer;
   }
-  if ((usage & rhi::BufferUsage::Uniform) != rhi::BufferUsage{0}) {
+  if ((usage & rhi::BufferUsage::Uniform) != rhi::BufferUsage{}) {
     vkUsage |= vk::BufferUsageFlagBits::eUniformBuffer;
   }
-  if ((usage & rhi::BufferUsage::Storage) != rhi::BufferUsage{0}) {
+  if ((usage & rhi::BufferUsage::Storage) != rhi::BufferUsage{}) {
     vkUsage |= vk::BufferUsageFlagBits::eStorageBuffer;
-    vkUsage |= vk::BufferUsageFlagBits::eShaderDeviceAddress;
   }
-
-  vkUsage |= vk::BufferUsageFlagBits::eTransferSrc |
-             vk::BufferUsageFlagBits::eTransferDst;
+  if ((usage & rhi::BufferUsage::Indirect) != rhi::BufferUsage{}) {
+    vkUsage |= vk::BufferUsageFlagBits::eIndirectBuffer;
+  }
+  if ((usage & rhi::BufferUsage::TransferSrc) != rhi::BufferUsage{}) {
+    vkUsage |= vk::BufferUsageFlagBits::eTransferSrc;
+  }
+  if ((usage & rhi::BufferUsage::TransferDst) != rhi::BufferUsage{}) {
+    vkUsage |= vk::BufferUsageFlagBits::eTransferDst;
+  }
 
   // Map RHI MemoryUsage to VMA
   switch (memUsage) {

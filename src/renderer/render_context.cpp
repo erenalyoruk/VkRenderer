@@ -10,18 +10,24 @@
 namespace renderer {
 
 RenderContext::RenderContext(rhi::Device& device, rhi::Factory& factory)
-    : device_{device},
-      factory_{factory},
-      pipelineManager_{factory, device},
-      materialManager_{factory} {
+    : device_{device}, factory_{factory}, pipelineManager_{factory, device} {
   CreateDescriptors();
 
-  materialManager_.SetSampler(*defaultSampler_);
-  materialManager_.Initialize(materialDescriptorLayout_.get());
+  // Initialize bindless material manager
+  bindlessMaterials_ = std::make_unique<BindlessMaterialManager>(factory_);
+  bindlessMaterials_->Initialize();
 
-  // Initialize pipeline manager with our descriptor layouts
+  // Initialize GPU culling
+  gpuCulling_ = std::make_unique<GPUCulling>(factory_, device_);
+  gpuCulling_->Initialize();
+
+  // Initialize pipeline manager with descriptor layouts:
+  // set 0: global uniforms
+  // set 1: bindless materials
+  // set 2: object data SSBO
   pipelineManager_.Initialize(globalDescriptorLayout_.get(),
-                              materialDescriptorLayout_.get());
+                              bindlessMaterials_->GetDescriptorLayout(),
+                              gpuCulling_->GetObjectDescriptorLayout());
 
   CreateSyncObjects();
   CreateFrameResources();
@@ -29,7 +35,6 @@ RenderContext::RenderContext(rhi::Device& device, rhi::Factory& factory)
 }
 
 void RenderContext::CreateSyncObjects() {
-  // Create semaphores per swapchain image
   uint32_t imageCount = device_.GetSwapchain()->GetImageCount();
 
   imageAvailableSemaphores_.reserve(imageCount);
@@ -50,17 +55,10 @@ void RenderContext::CreateFrameResources() {
     frame.commandPool = factory_.CreateCommandPool(rhi::QueueType::Graphics);
     frame.commandBuffer = frame.commandPool->AllocateCommandBuffer();
 
-    // Global uniform buffer
     frame.globalUniformBuffer =
         factory_.CreateBuffer(sizeof(GlobalUniforms), rhi::BufferUsage::Uniform,
                               rhi::MemoryUsage::CPUToGPU);
 
-    // Object uniform buffer (for dynamic per-object data if needed)
-    frame.objectUniformBuffer = factory_.CreateBuffer(
-        sizeof(ObjectUniforms) * 10000, rhi::BufferUsage::Uniform,
-        rhi::MemoryUsage::CPUToGPU);
-
-    // Global descriptor set
     frame.globalDescriptorSet =
         factory_.CreateDescriptorSet(globalDescriptorLayout_.get());
 
@@ -70,42 +68,11 @@ void RenderContext::CreateFrameResources() {
 }
 
 void RenderContext::CreateDescriptors() {
-  // Global descriptor layout (set 0)
+  // Global descriptor layout (set 0) - just camera/lighting uniforms
   std::array<rhi::DescriptorBinding, 1> globalBindings = {{
       {.binding = 0, .type = rhi::DescriptorType::UniformBuffer, .count = 1},
   }};
   globalDescriptorLayout_ = factory_.CreateDescriptorSetLayout(globalBindings);
-
-  // Material descriptor layout (set 1)
-  // binding 0: MaterialUniforms
-  // binding 1: baseColorTex
-  // binding 2: normalTex
-  // binding 3: metallicRoughnessTex
-  // binding 4: occlusionTex
-  // binding 5: emissiveTex
-  std::array<rhi::DescriptorBinding, 6> materialBindings = {{
-      {.binding = 0, .type = rhi::DescriptorType::UniformBuffer, .count = 1},
-      {.binding = 1,
-       .type = rhi::DescriptorType::CombinedImageSampler,
-       .count = 1},
-      {.binding = 2,
-       .type = rhi::DescriptorType::CombinedImageSampler,
-       .count = 1},
-      {.binding = 3,
-       .type = rhi::DescriptorType::CombinedImageSampler,
-       .count = 1},
-      {.binding = 4,
-       .type = rhi::DescriptorType::CombinedImageSampler,
-       .count = 1},
-      {.binding = 5,
-       .type = rhi::DescriptorType::CombinedImageSampler,
-       .count = 1},
-  }};
-  materialDescriptorLayout_ =
-      factory_.CreateDescriptorSetLayout(materialBindings);
-
-  defaultSampler_ = factory_.CreateSampler(
-      rhi::Filter::Linear, rhi::Filter::Linear, rhi::AddressMode::Repeat);
 }
 
 void RenderContext::CreateDepthBuffer() {
@@ -136,16 +103,11 @@ void RenderContext::UpdateGlobalUniforms(const GlobalUniforms& uniforms) {
 }
 
 void RenderContext::OnSwapchainResized() {
-  // Wait for GPU to finish using old resources
   device_.WaitIdle();
 
-  // Recreate depth buffer to match new swapchain size
   CreateDepthBuffer();
-
-  // Recreate pipelines (swapchain format may have changed)
   pipelineManager_.RecreatePipelines();
 
-  // Recreate semaphores if swapchain image count changed
   uint32_t imageCount = device_.GetSwapchain()->GetImageCount();
   if (imageCount != imageAvailableSemaphores_.size()) {
     imageAvailableSemaphores_.clear();

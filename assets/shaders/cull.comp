@@ -1,0 +1,87 @@
+#version 450
+
+layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
+
+struct ObjectData {
+  mat4 model;
+  mat4 normalMatrix;
+  vec4 boundingSphere;  // xyz = center (local space), w = radius
+  uint materialIndex;
+  uint indexCount;
+  uint indexOffset;
+  int vertexOffset;
+};
+
+struct DrawIndexedIndirectCommand {
+  uint indexCount;
+  uint instanceCount;
+  uint firstIndex;
+  int vertexOffset;
+  uint firstInstance;  // Object index for fetching transform
+};
+
+layout(set = 0, binding = 0) uniform CullUniforms {
+  mat4 viewProjection;
+  vec4 frustumPlanes[6];
+  uint objectCount;
+  uint _padding[3];
+}
+cull;
+
+layout(std430, set = 0, binding = 1) readonly buffer ObjectBuffer {
+  ObjectData objects[];
+};
+
+layout(std430, set = 0, binding = 2) writeonly buffer DrawCommandBuffer {
+  DrawIndexedIndirectCommand drawCommands[];
+};
+
+layout(std430, set = 0, binding = 3) buffer DrawCountBuffer { uint drawCount; };
+
+// Test sphere against frustum plane
+bool sphereInsidePlane(vec3 center, float radius, vec4 plane) {
+  float distance = dot(plane.xyz, center) + plane.w;
+  return distance >= -radius;
+}
+
+// Test if bounding sphere is visible
+bool isVisible(vec3 center, float radius) {
+  for (int i = 0; i < 6; ++i) {
+    if (!sphereInsidePlane(center, radius, cull.frustumPlanes[i])) {
+      return false;
+    }
+  }
+  return true;
+}
+
+void main() {
+  uint objectIndex = gl_GlobalInvocationID.x;
+
+  if (objectIndex >= cull.objectCount) {
+    return;
+  }
+
+  ObjectData obj = objects[objectIndex];
+
+  // Transform bounding sphere center to world space
+  vec3 worldCenter = (obj.model * vec4(obj.boundingSphere.xyz, 1.0)).xyz;
+
+  // Scale radius by maximum scale component
+  vec3 scale = vec3(length(obj.model[0].xyz), length(obj.model[1].xyz),
+                    length(obj.model[2].xyz));
+  float worldRadius =
+      obj.boundingSphere.w * max(scale.x, max(scale.y, scale.z));
+
+  // Frustum test
+  if (isVisible(worldCenter, worldRadius)) {
+    // Atomically increment draw count and get index
+    uint drawIndex = atomicAdd(drawCount, 1);
+
+    // Write draw command
+    drawCommands[drawIndex].indexCount = obj.indexCount;
+    drawCommands[drawIndex].instanceCount = 1;
+    drawCommands[drawIndex].firstIndex = obj.indexOffset;
+    drawCommands[drawIndex].vertexOffset = obj.vertexOffset;
+    drawCommands[drawIndex].firstInstance = objectIndex;  // Pass object index
+  }
+}

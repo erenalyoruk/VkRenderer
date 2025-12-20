@@ -261,6 +261,121 @@ void VulkanCommandBuffer::DrawIndexed(uint32_t indexCount,
                              vertexOffset, firstInstance);
 }
 
+void VulkanCommandBuffer::DrawIndexedIndirect(const rhi::Buffer* buffer,
+                                              rhi::Size offset,
+                                              uint32_t drawCount,
+                                              uint32_t stride) {
+  const auto* vkBuffer = std::bit_cast<const VulkanBuffer*>(buffer);
+  commandBuffer_.drawIndexedIndirect(vkBuffer->GetHandle(), offset, drawCount,
+                                     stride);
+}
+
+void VulkanCommandBuffer::DrawIndexedIndirectCount(
+    const rhi::Buffer* commandBuffer, rhi::Size commandOffset,
+    const rhi::Buffer* countBuffer, rhi::Size countOffset,
+    uint32_t maxDrawCount, uint32_t stride) {
+  const auto* vkCmdBuffer = std::bit_cast<const VulkanBuffer*>(commandBuffer);
+  const auto* vkCountBuffer = std::bit_cast<const VulkanBuffer*>(countBuffer);
+
+  commandBuffer_.drawIndexedIndirectCount(
+      vkCmdBuffer->GetHandle(), commandOffset, vkCountBuffer->GetHandle(),
+      countOffset, maxDrawCount, stride);
+}
+
+void VulkanCommandBuffer::Dispatch(uint32_t groupCountX, uint32_t groupCountY,
+                                   uint32_t groupCountZ) {
+  commandBuffer_.dispatch(groupCountX, groupCountY, groupCountZ);
+}
+
+void VulkanCommandBuffer::BufferBarrier(const rhi::Buffer* buffer,
+                                        rhi::AccessFlags srcAccess,
+                                        rhi::AccessFlags dstAccess) {
+  const auto* vkBuffer = std::bit_cast<const VulkanBuffer*>(buffer);
+
+  auto convertAccess = [](rhi::AccessFlags flags) -> vk::AccessFlags2 {
+    vk::AccessFlags2 result{};
+    if ((flags & rhi::AccessFlags::ShaderRead) != rhi::AccessFlags::None) {
+      result |= vk::AccessFlagBits2::eShaderRead;
+    }
+    if ((flags & rhi::AccessFlags::ShaderWrite) != rhi::AccessFlags::None) {
+      result |= vk::AccessFlagBits2::eShaderWrite;
+    }
+    if ((flags & rhi::AccessFlags::IndirectCommandRead) !=
+        rhi::AccessFlags::None) {
+      result |= vk::AccessFlagBits2::eIndirectCommandRead;
+    }
+    if ((flags & rhi::AccessFlags::TransferRead) != rhi::AccessFlags::None) {
+      result |= vk::AccessFlagBits2::eTransferRead;
+    }
+    if ((flags & rhi::AccessFlags::TransferWrite) != rhi::AccessFlags::None) {
+      result |= vk::AccessFlagBits2::eTransferWrite;
+    }
+    return result;
+  };
+
+  // Determine source stage based on access flags
+  auto getSrcStage = [](rhi::AccessFlags flags) -> vk::PipelineStageFlags2 {
+    vk::PipelineStageFlags2 stage{};
+    if ((flags & rhi::AccessFlags::TransferWrite) != rhi::AccessFlags::None ||
+        (flags & rhi::AccessFlags::TransferRead) != rhi::AccessFlags::None) {
+      stage |= vk::PipelineStageFlagBits2::eTransfer;
+    }
+    if ((flags & rhi::AccessFlags::ShaderRead) != rhi::AccessFlags::None ||
+        (flags & rhi::AccessFlags::ShaderWrite) != rhi::AccessFlags::None) {
+      stage |= vk::PipelineStageFlagBits2::eComputeShader;
+    }
+    if (stage == vk::PipelineStageFlags2{}) {
+      stage = vk::PipelineStageFlagBits2::eAllCommands;
+    }
+    return stage;
+  };
+
+  // Determine destination stage based on access flags
+  auto getDstStage = [](rhi::AccessFlags flags) -> vk::PipelineStageFlags2 {
+    vk::PipelineStageFlags2 stage{};
+    if ((flags & rhi::AccessFlags::IndirectCommandRead) !=
+        rhi::AccessFlags::None) {
+      stage |= vk::PipelineStageFlagBits2::eDrawIndirect;
+    }
+    if ((flags & rhi::AccessFlags::ShaderRead) != rhi::AccessFlags::None ||
+        (flags & rhi::AccessFlags::ShaderWrite) != rhi::AccessFlags::None) {
+      stage |= vk::PipelineStageFlagBits2::eVertexShader |
+               vk::PipelineStageFlagBits2::eComputeShader;
+    }
+    if ((flags & rhi::AccessFlags::TransferRead) != rhi::AccessFlags::None ||
+        (flags & rhi::AccessFlags::TransferWrite) != rhi::AccessFlags::None) {
+      stage |= vk::PipelineStageFlagBits2::eTransfer;
+    }
+    if (stage == vk::PipelineStageFlags2{}) {
+      stage = vk::PipelineStageFlagBits2::eAllCommands;
+    }
+    return stage;
+  };
+
+  vk::BufferMemoryBarrier2 barrier{
+      .srcStageMask = getSrcStage(srcAccess),
+      .srcAccessMask = convertAccess(srcAccess),
+      .dstStageMask = getDstStage(dstAccess),
+      .dstAccessMask = convertAccess(dstAccess),
+      .buffer = vkBuffer->GetHandle(),
+      .offset = 0,
+      .size = VK_WHOLE_SIZE,
+  };
+
+  vk::DependencyInfo depInfo{
+      .bufferMemoryBarrierCount = 1,
+      .pBufferMemoryBarriers = &barrier,
+  };
+
+  commandBuffer_.pipelineBarrier2(depInfo);
+}
+
+void VulkanCommandBuffer::FillBuffer(rhi::Buffer* buffer, rhi::Size offset,
+                                     rhi::Size size, uint32_t value) {
+  auto* vkBuffer = std::bit_cast<VulkanBuffer*>(buffer);
+  commandBuffer_.fillBuffer(vkBuffer->GetHandle(), offset, size, value);
+}
+
 void VulkanCommandBuffer::TransitionTexture(rhi::Texture* texture,
                                             rhi::ImageLayout oldLayout,
                                             rhi::ImageLayout newLayout) {

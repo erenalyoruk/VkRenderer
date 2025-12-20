@@ -156,7 +156,7 @@ VulkanContext::VulkanContext(class Window& window, uint32_t width,
         {.type = vk::DescriptorType::eSampledImage, .descriptorCount = 1000},
         {.type = vk::DescriptorType::eSampler, .descriptorCount = 100},
         {.type = vk::DescriptorType::eCombinedImageSampler,
-         .descriptorCount = 1000},
+         .descriptorCount = 2048},
     }};
 
     vk::DescriptorPoolCreateInfo poolInfo{
@@ -354,6 +354,9 @@ void VulkanContext::CreateLogicalDevice() {
 
   vk::PhysicalDeviceVulkan12Features deviceFeatures12{
       .pNext = &deviceFeatures13,
+      .drawIndirectCount = VK_TRUE,
+      .shaderSampledImageArrayNonUniformIndexing = VK_TRUE,
+      .runtimeDescriptorArray = VK_TRUE,
       .bufferDeviceAddress = VK_TRUE,
   };
 
@@ -367,7 +370,9 @@ void VulkanContext::CreateLogicalDevice() {
 
   const std::vector<const char*> kDeviceExtensions{
       VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+      VK_KHR_DRAW_INDIRECT_COUNT_EXTENSION_NAME,
       "VK_KHR_buffer_device_address",
+      "VK_KHR_dynamic_rendering",
   };
 
   vk::DeviceCreateInfo createInfo{

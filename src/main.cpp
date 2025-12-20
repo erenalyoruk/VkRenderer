@@ -53,9 +53,8 @@ int main() {
 
   ecs::TransformComponent sponzaTransform{};
   sponzaTransform.scale = glm::vec3(1.0F);
-  auto rootEntity = resource::SceneLoader::Instantiate(
-      registry, *sponzaModel, renderSystem.GetContext().GetMaterialManager(),
-      sponzaTransform);
+  auto rootEntity = resource::InstantiateModel(
+      registry, *sponzaModel, renderSystem.GetContext().GetBindlessMaterials());
 
   size_t totalPrimitives = 0;
   for (const auto& mesh : sponzaModel->meshes) {
@@ -139,18 +138,7 @@ int main() {
         camComp.frustumPlanes = camera.GetFrustumPlanes();
       },
       // Render callback
-      [&](float deltaTime) {
-        renderSystem.Render(registry, deltaTime);
-
-        // Print stats every 5 seconds
-        statsTimer += deltaTime;
-        if (statsTimer >= 5.0F) {
-          statsTimer = 0.0F;
-          const auto& stats = renderSystem.GetStats();
-          LOG_DEBUG("Draw calls: {}, Triangles: {}, FPS: {:.1f}",
-                    stats.drawCalls, stats.triangles, 1.0F / deltaTime);
-        }
-      });
+      [&](float deltaTime) { renderSystem.Render(registry, deltaTime); });
 
   device->WaitIdle();
   return 0;
