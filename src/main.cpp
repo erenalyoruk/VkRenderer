@@ -77,15 +77,17 @@ int main() {
   camera.SetPosition(glm::vec3(0.0F, 2.0F, 5.0F));  // Start position
   camera::FPSCameraController cameraController{camera};
 
-  // Handle window resize
-  app.GetWindow().AddResizeCallback([&camera, &device](int width, int height) {
-    camera.SetAspectRatio(static_cast<float>(width) /
-                          static_cast<float>(height));
-    device->GetSwapchain()->Resize(width, height);
-  });
-
   // Create render system
   renderer::RenderSystem renderSystem{*device, *factory};
+
+  // Handle window resize
+  app.GetWindow().AddResizeCallback(
+      [&renderSystem, &camera, &device](int width, int height) {
+        camera.SetAspectRatio(static_cast<float>(width) /
+                              static_cast<float>(height));
+        device->GetSwapchain()->Resize(width, height);
+        renderSystem.OnSwapchainResized();
+      });
 
   // Main loop
   app.Run(

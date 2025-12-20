@@ -90,6 +90,8 @@ class RenderContext {
 
   void UpdateGlobalUniforms(const GlobalUniforms& uniforms);
 
+  void OnSwapchainResized();
+
  private:
   void CreateFrameResources();
   void CreateSyncObjects();

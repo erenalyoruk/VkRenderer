@@ -23,6 +23,8 @@ class RenderSystem {
 
   [[nodiscard]] const RenderStats& GetStats() const { return stats_; }
 
+  void OnSwapchainResized() { context_.OnSwapchainResized(); }
+
  private:
   void UpdateTransforms(entt::registry& registry);
   void FrustumCull(entt::registry& registry);

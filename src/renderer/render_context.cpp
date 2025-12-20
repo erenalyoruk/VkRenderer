@@ -157,4 +157,19 @@ void RenderContext::UpdateGlobalUniforms(const GlobalUniforms& uniforms) {
   frame.globalUniformBuffer->Unmap();
 }
 
+void RenderContext::OnSwapchainResized() {
+  // Wait for GPU to finish using old resources
+  device_.WaitIdle();
+
+  // Recreate depth buffer to match new swapchain size
+  CreateDepthBuffer();
+
+  // Recreate semaphores if swapchain image count changed
+  uint32_t imageCount = device_.GetSwapchain()->GetImageCount();
+  if (imageCount != imageAvailableSemaphores_.size()) {
+    imageAvailableSemaphores_.clear();
+    renderFinishedSemaphores_.clear();
+    CreateSyncObjects();
+  }
+}
 }  // namespace renderer
