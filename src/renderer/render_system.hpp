@@ -3,6 +3,7 @@
 #include <entt/entt.hpp>
 
 #include "ecs/components.hpp"
+#include "pipeline_manager.hpp"
 #include "render_context.hpp"
 #include "rhi/device.hpp"
 
@@ -25,6 +26,15 @@ class RenderSystem {
 
   void OnSwapchainResized() { context_.OnSwapchainResized(); }
 
+  // Pipeline control
+  void SetActivePipeline(PipelineType type) { activePipeline_ = type; }
+  [[nodiscard]] PipelineType GetActivePipeline() const {
+    return activePipeline_;
+  }
+
+  // Access to render context for material creation etc.
+  [[nodiscard]] RenderContext& GetContext() { return context_; }
+
  private:
   void UpdateTransforms(entt::registry& registry);
   void FrustumCull(entt::registry& registry);
@@ -35,6 +45,10 @@ class RenderSystem {
   RenderContext context_;
   RenderStats stats_;
   uint32_t frameCounter_{0};
+  float totalTime_{0.0F};
+
+  // Active pipeline type
+  PipelineType activePipeline_{PipelineType::PBRLit};
 
   // Cached camera data
   ecs::CameraComponent* activeCamera_{nullptr};

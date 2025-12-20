@@ -12,12 +12,13 @@ namespace rhi {
  * @brief Types of descriptors that can be used in descriptor sets.
  */
 enum class DescriptorType : uint8_t {
-  UniformBuffer,  // UBO
-  StorageBuffer,  // SSBO
-  SampledImage,   // Sampled Texture
-  Sampler,        // Sampler
+  UniformBuffer,         // UBO
+  StorageBuffer,         // SSBO
+  SampledImage,          // Sampled Texture (separate from sampler)
+  Sampler,               // Sampler only
+  CombinedImageSampler,  // Texture + Sampler combined
+  StorageImage,          // Storage image for compute
 };
-
 /**
  * @brief Represents a single binding within a descriptor set layout.
  */

@@ -1,19 +1,22 @@
 #include "renderer/render_context.hpp"
 
 #include <array>
+#include <cstring>
 
-#include "ecs/components.hpp"
 #include "logger.hpp"
-#include "rhi/shader_utils.hpp"
 
 #undef CreateSemaphore  // Windows macro conflict
 
 namespace renderer {
 
 RenderContext::RenderContext(rhi::Device& device, rhi::Factory& factory)
-    : device_{device}, factory_{factory} {
+    : device_{device}, factory_{factory}, pipelineManager_{factory, device} {
   CreateDescriptors();
-  CreatePipeline();
+
+  // Initialize pipeline manager with our descriptor layouts
+  pipelineManager_.Initialize(globalDescriptorLayout_.get(),
+                              materialDescriptorLayout_.get());
+
   CreateSyncObjects();
   CreateFrameResources();
   CreateDepthBuffer();
@@ -46,7 +49,7 @@ void RenderContext::CreateFrameResources() {
         factory_.CreateBuffer(sizeof(GlobalUniforms), rhi::BufferUsage::Uniform,
                               rhi::MemoryUsage::CPUToGPU);
 
-    // Object uniform buffer
+    // Object uniform buffer (for dynamic per-object data if needed)
     frame.objectUniformBuffer = factory_.CreateBuffer(
         sizeof(ObjectUniforms) * 10000, rhi::BufferUsage::Uniform,
         rhi::MemoryUsage::CPUToGPU);
@@ -61,73 +64,30 @@ void RenderContext::CreateFrameResources() {
 }
 
 void RenderContext::CreateDescriptors() {
+  // Global descriptor layout (set 0)
   std::array<rhi::DescriptorBinding, 1> globalBindings = {{
       {.binding = 0, .type = rhi::DescriptorType::UniformBuffer, .count = 1},
   }};
   globalDescriptorLayout_ = factory_.CreateDescriptorSetLayout(globalBindings);
 
+  // Material descriptor layout (set 1)
   std::array<rhi::DescriptorBinding, 4> materialBindings = {{
       {.binding = 0, .type = rhi::DescriptorType::UniformBuffer, .count = 1},
-      {.binding = 1, .type = rhi::DescriptorType::SampledImage, .count = 1},
-      {.binding = 2, .type = rhi::DescriptorType::SampledImage, .count = 1},
-      {.binding = 3, .type = rhi::DescriptorType::SampledImage, .count = 1},
+      {.binding = 1,
+       .type = rhi::DescriptorType::CombinedImageSampler,
+       .count = 1},
+      {.binding = 2,
+       .type = rhi::DescriptorType::CombinedImageSampler,
+       .count = 1},
+      {.binding = 3,
+       .type = rhi::DescriptorType::CombinedImageSampler,
+       .count = 1},
   }};
   materialDescriptorLayout_ =
       factory_.CreateDescriptorSetLayout(materialBindings);
 
   defaultSampler_ = factory_.CreateSampler(
       rhi::Filter::Linear, rhi::Filter::Linear, rhi::AddressMode::Repeat);
-}
-
-void RenderContext::CreatePipeline() {
-  auto vertShader = rhi::CreateShaderFromFile(
-      factory_, "assets/shaders/simple.vert.spv", rhi::ShaderStage::Vertex);
-  auto fragShader = rhi::CreateShaderFromFile(
-      factory_, "assets/shaders/simple.frag.spv", rhi::ShaderStage::Fragment);
-
-  if (!vertShader || !fragShader) {
-    LOG_ERROR("Failed to load shaders! Make sure .spv files exist.");
-    return;
-  }
-
-  std::array<rhi::DescriptorSetLayout*, 2> layouts = {
-      globalDescriptorLayout_.get(),
-      materialDescriptorLayout_.get(),
-  };
-
-  std::array<rhi::PushConstantRange, 1> pushConstants = {{
-      {.stage = rhi::ShaderStage::Vertex,
-       .offset = 0,
-       .size = sizeof(ObjectUniforms)},
-  }};
-
-  pipelineLayout_ = factory_.CreatePipelineLayout(layouts, pushConstants);
-
-  auto bindings = ecs::Vertex::GetBindings();
-  auto attributes = ecs::Vertex::GetAttributes();
-
-  auto* swapchain = device_.GetSwapchain();
-  rhi::Format colorFormat = swapchain->GetImages()[0]->GetFormat();
-
-  std::array<rhi::Format, 1> colorFormats = {colorFormat};
-
-  rhi::GraphicsPipelineDesc pipelineDesc{
-      .vertexShader = vertShader.get(),
-      .fragmentShader = fragShader.get(),
-      .layout = pipelineLayout_.get(),
-      .vertexBindings = bindings,
-      .vertexAttributes = attributes,
-      .colorFormats = colorFormats,
-      .depthFormat = rhi::Format::D32Sfloat,
-  };
-
-  pipeline_ = factory_.CreateGraphicsPipeline(pipelineDesc);
-
-  if (!pipeline_) {
-    LOG_ERROR("Failed to create graphics pipeline!");
-  } else {
-    LOG_INFO("Graphics pipeline created successfully.");
-  }
 }
 
 void RenderContext::CreateDepthBuffer() {
@@ -164,6 +124,9 @@ void RenderContext::OnSwapchainResized() {
   // Recreate depth buffer to match new swapchain size
   CreateDepthBuffer();
 
+  // Recreate pipelines (swapchain format may have changed)
+  pipelineManager_.RecreatePipelines();
+
   // Recreate semaphores if swapchain image count changed
   uint32_t imageCount = device_.GetSwapchain()->GetImageCount();
   if (imageCount != imageAvailableSemaphores_.size()) {
@@ -172,4 +135,5 @@ void RenderContext::OnSwapchainResized() {
     CreateSyncObjects();
   }
 }
+
 }  // namespace renderer

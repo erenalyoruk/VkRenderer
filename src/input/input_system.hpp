@@ -5,6 +5,8 @@
 #include <SDL3/SDL.h>
 #include <glm/vec2.hpp>
 
+#include "input/scan_codes.hpp"
+
 namespace input {
 enum class MouseButton : uint8_t {
   Left = 0,
@@ -20,9 +22,9 @@ class InputSystem {
   void ProcessEvent(const SDL_Event& event);
 
   // Keyboard
-  [[nodiscard]] bool IsKeyDown(SDL_Scancode key) const;
-  [[nodiscard]] bool IsKeyPressed(SDL_Scancode key) const;
-  [[nodiscard]] bool IsKeyReleased(SDL_Scancode key) const;
+  [[nodiscard]] bool IsKeyDown(ScanCode key) const;
+  [[nodiscard]] bool IsKeyPressed(ScanCode key) const;
+  [[nodiscard]] bool IsKeyReleased(ScanCode key) const;
 
   // Mouse
   [[nodiscard]] bool IsMouseDown(MouseButton button) const;

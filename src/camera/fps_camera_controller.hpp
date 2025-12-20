@@ -8,12 +8,12 @@
 namespace camera {
 
 struct FPSCameraControls {
-  SDL_Scancode forward{SDL_SCANCODE_W};
-  SDL_Scancode backward{SDL_SCANCODE_S};
-  SDL_Scancode left{SDL_SCANCODE_A};
-  SDL_Scancode right{SDL_SCANCODE_D};
-  SDL_Scancode up{SDL_SCANCODE_SPACE};
-  SDL_Scancode down{SDL_SCANCODE_LSHIFT};
+  input::ScanCode forward{input::ScanCode::W};
+  input::ScanCode backward{input::ScanCode::S};
+  input::ScanCode left{input::ScanCode::A};
+  input::ScanCode right{input::ScanCode::D};
+  input::ScanCode up{input::ScanCode::Space};
+  input::ScanCode down{input::ScanCode::LShift};
   input::MouseButton rotateButton{input::MouseButton::Right};
 };
 

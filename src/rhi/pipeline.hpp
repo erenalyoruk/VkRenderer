@@ -67,6 +67,11 @@ struct VertexAttribute {
 };
 
 /**
+ * @brief Face culling mode
+ */
+enum class CullMode : uint8_t { None, Front, Back };
+
+/**
  * @brief Structure describing the configuration of a graphics pipeline.
  */
 struct GraphicsPipelineDesc {
@@ -86,6 +91,15 @@ struct GraphicsPipelineDesc {
   // Color attachment formats for dynamic rendering
   std::span<const Format> colorFormats;
   Format depthFormat{Format::Undefined};
+
+  // Depth settings
+  bool depthTest{true};
+  bool depthWrite{true};
+
+  // Rasterization settings
+  CullMode cullMode{CullMode::Back};
+  bool wireframe{false};
+  bool blendEnabled{false};
 };
 
 /**

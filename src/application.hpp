@@ -17,10 +17,10 @@ struct ApplicationConfig {
 class Application {
  public:
   using UpdateCallback = std::function<void(float)>;
-  using RenderCallback = std::function<void()>;
+  using RenderCallback = std::function<void(float)>;
 
   explicit Application(const ApplicationConfig& config);
-  Application(int width, int height, const std::string& title);  // Convenience
+  Application(int width, int height, const std::string& title);
   ~Application();
 
   void Run(const UpdateCallback& update = nullptr,

@@ -35,7 +35,7 @@ void Application::Run(const UpdateCallback& update,
     }
 
     if (render) {
-      render();
+      render(deltaTime);  // Pass deltaTime to render
     }
   }
 }

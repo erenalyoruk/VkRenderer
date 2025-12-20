@@ -51,16 +51,21 @@ void InputSystem::ProcessEvent(const SDL_Event& event) {
   }
 }
 
-bool InputSystem::IsKeyDown(SDL_Scancode key) const {
-  return key < SDL_SCANCODE_COUNT && currentKeys_[key];
+bool InputSystem::IsKeyDown(ScanCode key) const {
+  return static_cast<SDL_Scancode>(key) < SDL_SCANCODE_COUNT &&
+         currentKeys_[static_cast<SDL_Scancode>(key)];
 }
 
-bool InputSystem::IsKeyPressed(SDL_Scancode key) const {
-  return key < SDL_SCANCODE_COUNT && currentKeys_[key] && !previousKeys_[key];
+bool InputSystem::IsKeyPressed(ScanCode key) const {
+  return static_cast<SDL_Scancode>(key) < SDL_SCANCODE_COUNT &&
+         currentKeys_[static_cast<SDL_Scancode>(key)] &&
+         !previousKeys_[static_cast<SDL_Scancode>(key)];
 }
 
-bool InputSystem::IsKeyReleased(SDL_Scancode key) const {
-  return key < SDL_SCANCODE_COUNT && !currentKeys_[key] && previousKeys_[key];
+bool InputSystem::IsKeyReleased(ScanCode key) const {
+  return static_cast<SDL_Scancode>(key) < SDL_SCANCODE_COUNT &&
+         !currentKeys_[static_cast<SDL_Scancode>(key)] &&
+         previousKeys_[static_cast<SDL_Scancode>(key)];
 }
 
 bool InputSystem::IsMouseDown(MouseButton button) const {

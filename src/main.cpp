@@ -5,6 +5,7 @@
 #include "camera/fps_camera_controller.hpp"
 #include "ecs/components.hpp"
 #include "logger.hpp"
+#include "renderer/pipeline_manager.hpp"
 #include "renderer/render_system.hpp"
 #include "resource/resource_manager.hpp"
 #include "resource/scene_loader.hpp"
@@ -35,7 +36,6 @@ int main() {
   // Create resource manager and load Sponza
   resource::ResourceManager resources{*factory};
 
-  // Try different possible paths for Sponza
   resource::Model* sponzaModel =
       resources.LoadModel("assets/models/Sponza/Sponza.gltf");
   if (sponzaModel == nullptr) {
@@ -48,7 +48,14 @@ int main() {
   ecs::TransformComponent sponzaTransform{};
   sponzaTransform.scale = glm::vec3(1.0F);
   resource::SceneLoader::Instantiate(registry, *sponzaModel, sponzaTransform);
-  LOG_INFO("Sponza instantiated with {} meshes", sponzaModel->meshes.size());
+
+  size_t totalPrimitives = 0;
+  for (const auto& mesh : sponzaModel->meshes) {
+    totalPrimitives += mesh.primitives.size();
+  }
+  LOG_INFO("Sponza: {} meshes, {} primitives, {} materials, {} textures",
+           sponzaModel->meshes.size(), totalPrimitives,
+           sponzaModel->materials.size(), sponzaModel->textures.size());
 
   // Create camera entity
   auto cameraEntity{registry.create()};
@@ -69,16 +76,19 @@ int main() {
   camera::CameraSettings cameraSettings{
       .fov = glm::radians(60.0F),
       .nearPlane = 0.1F,
-      .farPlane = 1000.0F,  // Increased for Sponza
+      .farPlane = 1000.0F,
       .movementSpeed = 5.0F,
       .mouseSensitivity = 0.1F,
   };
   camera::Camera camera{cameraSettings, app.GetWindow().GetAspectRatio()};
-  camera.SetPosition(glm::vec3(0.0F, 2.0F, 5.0F));  // Start position
+  camera.SetPosition(glm::vec3(0.0F, 2.0F, 5.0F));
   camera::FPSCameraController cameraController{camera};
 
   // Create render system
   renderer::RenderSystem renderSystem{*device, *factory};
+
+  // Current pipeline mode
+  renderer::PipelineType currentPipeline = renderer::PipelineType::PBRLit;
 
   // Handle window resize
   app.GetWindow().AddResizeCallback(
@@ -89,12 +99,36 @@ int main() {
         renderSystem.OnSwapchainResized();
       });
 
+  // Accumulator for stats logging
+  float statsTimer = 0.0F;
+
+  LOG_INFO("Controls: 1=PBR Lit, 2=Unlit, 3=Wireframe, WASD=Move, Mouse=Look");
+
   // Main loop
   app.Run(
       // Update callback
       [&](float deltaTime) {
-        // Update camera controller
-        cameraController.Update(app.GetInput(), deltaTime);
+        auto& input = app.GetInput();
+
+        cameraController.Update(input, deltaTime);
+
+        if (input.IsKeyPressed(input::ScanCode::Key1)) {
+          currentPipeline = renderer::PipelineType::PBRLit;
+          renderSystem.SetActivePipeline(currentPipeline);
+          LOG_INFO("Switched to PBR Lit pipeline");
+        }
+
+        if (input.IsKeyPressed(input::ScanCode::Key2)) {
+          currentPipeline = renderer::PipelineType::Unlit;
+          renderSystem.SetActivePipeline(currentPipeline);
+          LOG_INFO("Switched to Unlit pipeline");
+        }
+
+        if (input.IsKeyPressed(input::ScanCode::Key3)) {
+          currentPipeline = renderer::PipelineType::Wireframe;
+          renderSystem.SetActivePipeline(currentPipeline);
+          LOG_INFO("Switched to Wireframe pipeline");
+        }
 
         // Sync camera data to ECS camera component
         auto& camComp = registry.get<ecs::CameraComponent>(cameraEntity);
@@ -103,20 +137,19 @@ int main() {
         camComp.frustumPlanes = camera.GetFrustumPlanes();
       },
       // Render callback
-      [&]() {
-        renderSystem.Render(registry, 1.0F / 60.0F);
+      [&](float deltaTime) {
+        renderSystem.Render(registry, deltaTime);
 
-        // Optional: Print stats every few seconds
-        static int frameCount = 0;
-        if (++frameCount % 300 == 0) {
+        // Print stats every 5 seconds
+        statsTimer += deltaTime;
+        if (statsTimer >= 5.0F) {
+          statsTimer = 0.0F;
           const auto& stats = renderSystem.GetStats();
-          LOG_DEBUG("Draw calls: {}, Triangles: {}, Entities: {}",
-                    stats.drawCalls, stats.triangles, stats.entitiesProcessed);
+          LOG_DEBUG("Draw calls: {}, Triangles: {}, FPS: {:.1f}",
+                    stats.drawCalls, stats.triangles, 1.0F / deltaTime);
         }
       });
 
-  // Wait for GPU to finish before cleanup
   device->WaitIdle();
-
   return 0;
 }

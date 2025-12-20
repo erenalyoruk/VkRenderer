@@ -18,7 +18,6 @@ void RenderSystem::Render(entt::registry& registry, float deltaTime) {
   auto& frame = context_.GetCurrentFrame();
 
   // Use semaphore indexed by current frame for acquire
-  // We'll get the actual image index back
   uint32_t semaphoreIndex = frameCounter_ % swapchain->GetImageCount();
   auto* imageAvailableSem = context_.GetImageAvailableSemaphore(semaphoreIndex);
 
@@ -43,7 +42,8 @@ void RenderSystem::Render(entt::registry& registry, float deltaTime) {
   if (hasCamera) {
     GlobalUniforms globals{};
     globals.viewProjection = activeCamera_->projection * activeCamera_->view;
-    globals.time = static_cast<float>(frameCounter_) * deltaTime;
+    globals.time = totalTime_;
+    totalTime_ += deltaTime;
 
     auto lightView = registry.view<ecs::DirectionalLightComponent>();
     for (auto entity : lightView) {
@@ -127,39 +127,43 @@ void RenderSystem::ExecuteRendering(entt::registry& registry,
   auto* swapchain = device_.GetSwapchain();
   const auto& swapchainImages = swapchain->GetImages();
   auto* swapchainImage = swapchainImages[imageIndex];
-  auto* depthTexture = context_.GetDepthTexture();  // Add this
+  auto* depthTexture = context_.GetDepthTexture();
 
   cmd->Begin();
 
   cmd->TransitionTexture(swapchainImage, rhi::ImageLayout::Undefined,
                          rhi::ImageLayout::ColorAttachment);
 
-  // Transition depth buffer
   cmd->TransitionTexture(depthTexture, rhi::ImageLayout::Undefined,
                          rhi::ImageLayout::DepthStencilAttachment);
+
+  // Different clear colors for different modes
+  glm::vec4 clearColor{0.1F, 0.1F, 0.15F, 1.0F};
+  if (activePipeline_ == PipelineType::Wireframe) {
+    clearColor = glm::vec4{0.02F, 0.02F, 0.05F, 1.0F};  // Darker for wireframe
+  }
 
   rhi::RenderingAttachment colorAttachment{
       .texture = swapchainImage,
       .layout = rhi::ImageLayout::ColorAttachment,
       .loadOp = rhi::LoadOp::Clear,
       .storeOp = rhi::StoreOp::Store,
-      .clearValue = {0.2F, 0.3F, 0.4F, 1.0F},
+      .clearValue = {clearColor.r, clearColor.g, clearColor.b, clearColor.a},
   };
 
-  // Add depth attachment
   rhi::RenderingAttachment depthAttachment{
       .texture = depthTexture,
       .layout = rhi::ImageLayout::DepthStencilAttachment,
       .loadOp = rhi::LoadOp::Clear,
       .storeOp = rhi::StoreOp::DontCare,
-      .clearValue = {1.0F, 0.0F, 0.0F, 0.0F},  // Clear to 1.0 for depth
+      .clearValue = {1.0F, 0.0F, 0.0F, 0.0F},
   };
 
   rhi::RenderingInfo renderInfo{
       .width = swapchain->GetWidth(),
       .height = swapchain->GetHeight(),
       .colorAttachments = {&colorAttachment, 1},
-      .depthAttachment = &depthAttachment,  // Use depth buffer!
+      .depthAttachment = &depthAttachment,
   };
 
   cmd->BeginRendering(renderInfo);
@@ -168,7 +172,17 @@ void RenderSystem::ExecuteRendering(entt::registry& registry,
                    static_cast<float>(swapchain->GetHeight()), 0.0F, 1.0F);
   cmd->SetScissor(0, 0, swapchain->GetWidth(), swapchain->GetHeight());
 
-  auto* pipeline = context_.GetPipeline();
+  // Get the active pipeline
+  auto* pipeline = context_.GetPipeline(activePipeline_);
+
+  // Fallback chain if pipeline not available
+  if (pipeline == nullptr && activePipeline_ != PipelineType::PBRLit) {
+    pipeline = context_.GetPipeline(PipelineType::PBRLit);
+  }
+  if (pipeline == nullptr) {
+    pipeline = context_.GetPipeline(PipelineType::Unlit);
+  }
+
   if (pipeline != nullptr) {
     cmd->BindPipeline(pipeline);
 
@@ -204,8 +218,7 @@ void RenderSystem::ExecuteRendering(entt::registry& registry,
       cmd->BindIndexBuffer(*mesh.indexBuffer, 0, true);
 
       for (const auto& submesh : mesh.subMeshes) {
-        cmd->DrawIndexed(submesh.indexCount, 1, submesh.indexOffset,
-                         static_cast<int32_t>(submesh.vertexOffset), 0);
+        cmd->DrawIndexed(submesh.indexCount, 1, submesh.indexOffset, 0, 0);
         stats_.drawCalls++;
         stats_.triangles += submesh.indexCount / 3;
       }

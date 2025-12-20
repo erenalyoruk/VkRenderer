@@ -5,6 +5,7 @@
 
 #include <glm/glm.hpp>
 
+#include "renderer/pipeline_manager.hpp"
 #include "rhi/buffer.hpp"
 #include "rhi/command.hpp"
 #include "rhi/descriptor.hpp"
@@ -78,24 +79,37 @@ class RenderContext {
   // Resource access
   [[nodiscard]] rhi::Device& GetDevice() { return device_; }
   [[nodiscard]] rhi::Factory& GetFactory() { return factory_; }
-  [[nodiscard]] rhi::Pipeline* GetPipeline() { return pipeline_.get(); }
-  [[nodiscard]] rhi::PipelineLayout* GetPipelineLayout() {
-    return pipelineLayout_.get();
+
+  // Pipeline access through PipelineManager
+  [[nodiscard]] PipelineManager& GetPipelineManager() {
+    return pipelineManager_;
   }
+  [[nodiscard]] rhi::Pipeline* GetPipeline(PipelineType type) {
+    return pipelineManager_.GetPipeline(type);
+  }
+  [[nodiscard]] rhi::PipelineLayout* GetPipelineLayout() {
+    return pipelineManager_.GetPipelineLayout();
+  }
+
   [[nodiscard]] rhi::Sampler& GetDefaultSampler() { return *defaultSampler_; }
 
   [[nodiscard]] rhi::Texture* GetDepthTexture() const {
     return depthTexture_.get();
   }
 
-  void UpdateGlobalUniforms(const GlobalUniforms& uniforms);
+  [[nodiscard]] rhi::DescriptorSetLayout* GetGlobalDescriptorLayout() {
+    return globalDescriptorLayout_.get();
+  }
+  [[nodiscard]] rhi::DescriptorSetLayout* GetMaterialDescriptorLayout() {
+    return materialDescriptorLayout_.get();
+  }
 
+  void UpdateGlobalUniforms(const GlobalUniforms& uniforms);
   void OnSwapchainResized();
 
  private:
   void CreateFrameResources();
   void CreateSyncObjects();
-  void CreatePipeline();
   void CreateDescriptors();
   void CreateDepthBuffer();
 
@@ -109,11 +123,14 @@ class RenderContext {
   std::vector<std::unique_ptr<rhi::Semaphore>> imageAvailableSemaphores_;
   std::vector<std::unique_ptr<rhi::Semaphore>> renderFinishedSemaphores_;
 
-  // Shared resources
+  // Descriptor layouts (created before pipeline manager)
   std::unique_ptr<rhi::DescriptorSetLayout> globalDescriptorLayout_;
   std::unique_ptr<rhi::DescriptorSetLayout> materialDescriptorLayout_;
-  std::unique_ptr<rhi::PipelineLayout> pipelineLayout_;
-  std::unique_ptr<rhi::Pipeline> pipeline_;
+
+  // Pipeline management
+  PipelineManager pipelineManager_;
+
+  // Shared resources
   std::unique_ptr<rhi::Sampler> defaultSampler_;
   std::shared_ptr<rhi::Texture> depthTexture_;
 };

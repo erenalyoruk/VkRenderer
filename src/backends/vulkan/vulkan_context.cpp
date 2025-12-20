@@ -350,6 +350,10 @@ void VulkanContext::CreateLogicalDevice() {
 
   vk::PhysicalDeviceFeatures2 deviceFeatures2{
       .pNext = &deviceFeatures12,
+      .features =
+          vk::PhysicalDeviceFeatures{
+              .fillModeNonSolid = VK_TRUE,
+          },
   };
 
   const std::vector<const char*> kDeviceExtensions{

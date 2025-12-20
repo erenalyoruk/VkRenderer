@@ -65,6 +65,18 @@ vk::ShaderStageFlags ToVkShaderStage(rhi::ShaderStage stage) {
       return vk::ShaderStageFlagBits::eAll;
   }
 }
+
+vk::CullModeFlags ToVkCullMode(rhi::CullMode mode) {
+  switch (mode) {
+    case rhi::CullMode::None:
+      return vk::CullModeFlagBits::eNone;
+    case rhi::CullMode::Front:
+      return vk::CullModeFlagBits::eFront;
+    case rhi::CullMode::Back:
+    default:
+      return vk::CullModeFlagBits::eBack;
+  }
+}
 }  // namespace
 
 std::unique_ptr<VulkanPipelineLayout> VulkanPipelineLayout::Create(
@@ -177,9 +189,11 @@ std::unique_ptr<VulkanPipeline> VulkanPipeline::Create(
       .scissorCount = 1,
   };
 
+  // Use new pipeline desc fields
   vk::PipelineRasterizationStateCreateInfo rasterizer{
-      .polygonMode = vk::PolygonMode::eFill,
-      .cullMode = vk::CullModeFlagBits::eBack,
+      .polygonMode =
+          desc.wireframe ? vk::PolygonMode::eLine : vk::PolygonMode::eFill,
+      .cullMode = ToVkCullMode(desc.cullMode),
       .frontFace = vk::FrontFace::eCounterClockwise,
       .lineWidth = 1.0F,
   };
@@ -188,16 +202,24 @@ std::unique_ptr<VulkanPipeline> VulkanPipeline::Create(
       .rasterizationSamples = vk::SampleCountFlagBits::e1,
   };
 
+  // Use depth test/write from desc
   vk::PipelineDepthStencilStateCreateInfo depthStencil{
-      .depthTestEnable =
-          static_cast<vk::Bool32>(desc.depthFormat != rhi::Format::Undefined),
-      .depthWriteEnable =
-          static_cast<vk::Bool32>(desc.depthFormat != rhi::Format::Undefined),
+      .depthTestEnable = static_cast<vk::Bool32>(
+          desc.depthTest && desc.depthFormat != rhi::Format::Undefined),
+      .depthWriteEnable = static_cast<vk::Bool32>(
+          desc.depthWrite && desc.depthFormat != rhi::Format::Undefined),
       .depthCompareOp = vk::CompareOp::eLess,
   };
 
+  // Use blend enabled from desc
   vk::PipelineColorBlendAttachmentState colorBlendAttachment{
-      .blendEnable = VK_FALSE,
+      .blendEnable = static_cast<vk::Bool32>(desc.blendEnabled),
+      .srcColorBlendFactor = vk::BlendFactor::eSrcAlpha,
+      .dstColorBlendFactor = vk::BlendFactor::eOneMinusSrcAlpha,
+      .colorBlendOp = vk::BlendOp::eAdd,
+      .srcAlphaBlendFactor = vk::BlendFactor::eOne,
+      .dstAlphaBlendFactor = vk::BlendFactor::eZero,
+      .alphaBlendOp = vk::BlendOp::eAdd,
       .colorWriteMask =
           vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
           vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA,

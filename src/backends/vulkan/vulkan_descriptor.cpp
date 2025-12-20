@@ -27,6 +27,12 @@ std::unique_ptr<VulkanDescriptorSetLayout> VulkanDescriptorSetLayout::Create(
       case rhi::DescriptorType::Sampler:
         type = vk::DescriptorType::eSampler;
         break;
+      case rhi::DescriptorType::CombinedImageSampler:
+        type = vk::DescriptorType::eCombinedImageSampler;
+        break;
+      case rhi::DescriptorType::StorageImage:
+        type = vk::DescriptorType::eStorageImage;
+        break;
       default:
         type = vk::DescriptorType::eUniformBuffer;
         break;
