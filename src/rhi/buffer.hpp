@@ -22,6 +22,11 @@ constexpr BufferUsage operator&(BufferUsage a, BufferUsage b) {
                                   static_cast<uint8_t>(b));
 }
 
+constexpr BufferUsage operator|(BufferUsage a, BufferUsage b) {
+  return static_cast<BufferUsage>(static_cast<uint8_t>(a) |
+                                  static_cast<uint8_t>(b));
+}
+
 /**
  * @brief Abstract base class for RHI buffer objects.
  */
