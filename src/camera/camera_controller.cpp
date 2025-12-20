@@ -45,7 +45,7 @@ void Camera::UpdateView() {
 void Camera::UpdateProjection() {
   projection_ = glm::perspective(settings_.fov, aspectRatio_,
                                  settings_.nearPlane, settings_.farPlane);
-  projection_[1][1] *= -1;  // Vulkan NDC Y is inverted
+  projection_[1][1] *= -1.0F;  // Vulkan NDC Y is inverted
 }
 
 void Camera::UpdateFrustum() {

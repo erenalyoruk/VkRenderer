@@ -16,6 +16,7 @@ RenderContext::RenderContext(rhi::Device& device, rhi::Factory& factory)
   CreatePipeline();
   CreateSyncObjects();
   CreateFrameResources();
+  CreateDepthBuffer();
 }
 
 void RenderContext::CreateSyncObjects() {
@@ -129,9 +130,18 @@ void RenderContext::CreatePipeline() {
   }
 }
 
+void RenderContext::CreateDepthBuffer() {
+  auto* swapchain = device_.GetSwapchain();
+  depthTexture_ = factory_.CreateTexture(
+      swapchain->GetWidth(), swapchain->GetHeight(), rhi::Format::D32Sfloat,
+      rhi::TextureUsage::DepthStencilAttachment);
+  LOG_INFO("Created depth buffer {}x{}", swapchain->GetWidth(),
+           swapchain->GetHeight());
+}
+
 void RenderContext::BeginFrame(uint32_t frameIndex) {
   currentFrame_ = frameIndex % kMaxFramesInFlight;
-  auto& frame = frames_[currentFrame_]; // NOLINT
+  auto& frame = frames_[currentFrame_];  // NOLINT
 
   frame.inFlightFence->Wait();
   frame.inFlightFence->Reset();

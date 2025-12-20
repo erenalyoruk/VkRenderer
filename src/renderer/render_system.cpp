@@ -81,13 +81,36 @@ void RenderSystem::Render(entt::registry& registry, float deltaTime) {
 }
 
 void RenderSystem::UpdateTransforms(entt::registry& registry) {
-  auto view =
-      registry.view<ecs::TransformComponent, ecs::WorldTransformComponent>();
+  // First, update root transforms (no parent)
+  auto rootView =
+      registry.view<ecs::TransformComponent, ecs::WorldTransformComponent>(
+          entt::exclude<ecs::HierarchyComponent>);
 
-  for (auto entity : view) {
-    auto& local = view.get<ecs::TransformComponent>(entity);
-    auto& world = view.get<ecs::WorldTransformComponent>(entity);
+  for (auto entity : rootView) {
+    auto& local = rootView.get<ecs::TransformComponent>(entity);
+    auto& world = rootView.get<ecs::WorldTransformComponent>(entity);
     world.matrix = local.GetMatrix();
+    stats_.entitiesProcessed++;
+  }
+
+  // Then update children with parent hierarchy
+  auto childView =
+      registry.view<ecs::TransformComponent, ecs::WorldTransformComponent,
+                    ecs::HierarchyComponent>();
+
+  for (auto entity : childView) {
+    auto& local = childView.get<ecs::TransformComponent>(entity);
+    auto& world = childView.get<ecs::WorldTransformComponent>(entity);
+    auto& hierarchy = childView.get<ecs::HierarchyComponent>(entity);
+
+    if (hierarchy.parent != entt::null &&
+        registry.all_of<ecs::WorldTransformComponent>(hierarchy.parent)) {
+      auto& parentWorld =
+          registry.get<ecs::WorldTransformComponent>(hierarchy.parent);
+      world.matrix = parentWorld.matrix * local.GetMatrix();
+    } else {
+      world.matrix = local.GetMatrix();
+    }
     stats_.entitiesProcessed++;
   }
 }
@@ -104,11 +127,16 @@ void RenderSystem::ExecuteRendering(entt::registry& registry,
   auto* swapchain = device_.GetSwapchain();
   const auto& swapchainImages = swapchain->GetImages();
   auto* swapchainImage = swapchainImages[imageIndex];
+  auto* depthTexture = context_.GetDepthTexture();  // Add this
 
   cmd->Begin();
 
   cmd->TransitionTexture(swapchainImage, rhi::ImageLayout::Undefined,
                          rhi::ImageLayout::ColorAttachment);
+
+  // Transition depth buffer
+  cmd->TransitionTexture(depthTexture, rhi::ImageLayout::Undefined,
+                         rhi::ImageLayout::DepthStencilAttachment);
 
   rhi::RenderingAttachment colorAttachment{
       .texture = swapchainImage,
@@ -118,11 +146,20 @@ void RenderSystem::ExecuteRendering(entt::registry& registry,
       .clearValue = {0.2F, 0.3F, 0.4F, 1.0F},
   };
 
+  // Add depth attachment
+  rhi::RenderingAttachment depthAttachment{
+      .texture = depthTexture,
+      .layout = rhi::ImageLayout::DepthStencilAttachment,
+      .loadOp = rhi::LoadOp::Clear,
+      .storeOp = rhi::StoreOp::DontCare,
+      .clearValue = {1.0F, 0.0F, 0.0F, 0.0F},  // Clear to 1.0 for depth
+  };
+
   rhi::RenderingInfo renderInfo{
       .width = swapchain->GetWidth(),
       .height = swapchain->GetHeight(),
       .colorAttachments = {&colorAttachment, 1},
-      .depthAttachment = nullptr,
+      .depthAttachment = &depthAttachment,  // Use depth buffer!
   };
 
   cmd->BeginRendering(renderInfo);

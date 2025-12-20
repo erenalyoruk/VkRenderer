@@ -3,6 +3,8 @@
 #include <bit>
 #include <cstring>
 
+#include <glm/gtc/type_ptr.hpp>
+
 #define TINYGLTF_IMPLEMENTATION
 #define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_WRITE_IMPLEMENTATION
@@ -192,86 +194,164 @@ struct ModelLoader::Impl {
         prim.indexOffset = static_cast<uint32_t>(indices.size());
         prim.materialIndex = primitive.material;
 
-        // Get accessors
-        const float* positions = nullptr;
-        const float* normals = nullptr;
-        const float* texcoords = nullptr;
-        const float* colors = nullptr;
         size_t vertexCount = 0;
 
-        // Position (required)
+        // Get position accessor info (required)
+        const tinygltf::Accessor* posAccessor = nullptr;
+        const uint8_t* posData = nullptr;
+        size_t posStride = 0;
+
         if (auto it = primitive.attributes.find("POSITION");
             it != primitive.attributes.end()) {
-          const auto& accessor = gltf.accessors[it->second];
-          const auto& bufferView = gltf.bufferViews[accessor.bufferView];
+          posAccessor = &gltf.accessors[it->second];
+          const auto& bufferView = gltf.bufferViews[posAccessor->bufferView];
           const auto& buffer = gltf.buffers[bufferView.buffer];
-
-          positions = std::bit_cast<const float*>(
-              buffer.data.data() + bufferView.byteOffset + accessor.byteOffset);
-          vertexCount = accessor.count;
+          posData = buffer.data.data() + bufferView.byteOffset +
+                    posAccessor->byteOffset;
+          posStride = (bufferView.byteStride != 0U) ? bufferView.byteStride
+                                                    : sizeof(float) * 3;
+          vertexCount = posAccessor->count;
 
           // Update bounds
-          if (accessor.minValues.size() >= 3) {
-            minBounds = glm::min(minBounds, glm::vec3(accessor.minValues[0],
-                                                      accessor.minValues[1],
-                                                      accessor.minValues[2]));
+          if (posAccessor->minValues.size() >= 3) {
+            minBounds =
+                glm::min(minBounds, glm::vec3(posAccessor->minValues[0],
+                                              posAccessor->minValues[1],
+                                              posAccessor->minValues[2]));
           }
-          if (accessor.maxValues.size() >= 3) {
-            maxBounds = glm::max(maxBounds, glm::vec3(accessor.maxValues[0],
-                                                      accessor.maxValues[1],
-                                                      accessor.maxValues[2]));
+          if (posAccessor->maxValues.size() >= 3) {
+            maxBounds =
+                glm::max(maxBounds, glm::vec3(posAccessor->maxValues[0],
+                                              posAccessor->maxValues[1],
+                                              posAccessor->maxValues[2]));
           }
+        } else {
+          LOG_WARNING("Mesh primitive missing POSITION attribute: {}",
+                      mesh.name);
+          continue;
         }
 
         // Normal
+        const uint8_t* normData = nullptr;
+        size_t normStride = 0;
         if (auto it = primitive.attributes.find("NORMAL");
             it != primitive.attributes.end()) {
           const auto& accessor = gltf.accessors[it->second];
           const auto& bufferView = gltf.bufferViews[accessor.bufferView];
           const auto& buffer = gltf.buffers[bufferView.buffer];
-          normals = std::bit_cast<const float*>(
-              buffer.data.data() + bufferView.byteOffset + accessor.byteOffset);
+          normData =
+              buffer.data.data() + bufferView.byteOffset + accessor.byteOffset;
+          normStride = (bufferView.byteStride != 0U) ? bufferView.byteStride
+                                                     : sizeof(float) * 3;
         }
 
         // Texcoord
+        const uint8_t* texData = nullptr;
+        size_t texStride = 0;
         if (auto it = primitive.attributes.find("TEXCOORD_0");
             it != primitive.attributes.end()) {
           const auto& accessor = gltf.accessors[it->second];
           const auto& bufferView = gltf.bufferViews[accessor.bufferView];
           const auto& buffer = gltf.buffers[bufferView.buffer];
-          texcoords = std::bit_cast<const float*>(
-              buffer.data.data() + bufferView.byteOffset + accessor.byteOffset);
+          texData =
+              buffer.data.data() + bufferView.byteOffset + accessor.byteOffset;
+          texStride = (bufferView.byteStride != 0U) ? bufferView.byteStride
+                                                    : sizeof(float) * 2;
         }
 
-        // Color
+        // Color (handle different types)
+        const uint8_t* colorData = nullptr;
+        size_t colorStride = 0;
+        int colorComponentType = 0;
+        int colorType = 0;  // VEC3 or VEC4
         if (auto it = primitive.attributes.find("COLOR_0");
             it != primitive.attributes.end()) {
           const auto& accessor = gltf.accessors[it->second];
           const auto& bufferView = gltf.bufferViews[accessor.bufferView];
           const auto& buffer = gltf.buffers[bufferView.buffer];
-          colors = std::bit_cast<const float*>(
-              buffer.data.data() + bufferView.byteOffset + accessor.byteOffset);
+          colorData =
+              buffer.data.data() + bufferView.byteOffset + accessor.byteOffset;
+          colorComponentType = accessor.componentType;
+          colorType = accessor.type;  // TINYGLTF_TYPE_VEC3 or VEC4
+
+          size_t componentSize = 4;  // float
+          if (colorComponentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE) {
+            componentSize = 1;
+          } else if (colorComponentType ==
+                     TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT) {
+            componentSize = 2;
+          }
+          size_t numComponents = (colorType == TINYGLTF_TYPE_VEC3) ? 3 : 4;
+          colorStride = (bufferView.byteStride != 0U)
+                            ? bufferView.byteStride
+                            : componentSize * numComponents;
         }
 
         // Build vertices
         for (size_t i = 0; i < vertexCount; ++i) {
           ecs::Vertex v{};
-          v.position = glm::vec3(positions[(i * 3) + 0], positions[(i * 3) + 1],
-                                 positions[(i * 3) + 2]);
-          if (normals != nullptr) {
-            v.normal = glm::vec3(normals[(i * 3) + 0], normals[(i * 3) + 1],
-                                 normals[(i * 3) + 2]);
+
+          // Position
+          const auto* pos =
+              std::bit_cast<const float*>(posData + (i * posStride));
+          v.position = glm::vec3(pos[0], pos[1], pos[2]);
+
+          // Normal
+          if (normData != nullptr) {
+            const auto* norm =
+                std::bit_cast<const float*>(normData + (i * normStride));
+            v.normal = glm::vec3(norm[0], norm[1], norm[2]);
+          } else {
+            v.normal = glm::vec3(0.0F, 1.0F, 0.0F);  // Default up normal
           }
-          if (texcoords != nullptr) {
-            v.texCoord =
-                glm::vec2(texcoords[(i * 2) + 0], texcoords[(i * 2) + 1]);
+
+          // Texcoord
+          if (texData != nullptr) {
+            const auto* tex =
+                std::bit_cast<const float*>(texData + (i * texStride));
+            v.texCoord = glm::vec2(tex[0], tex[1]);
           }
-          if (colors != nullptr) {
-            v.color = glm::vec4(colors[(i * 4) + 0], colors[(i * 4) + 1],
-                                colors[(i * 4) + 2], colors[(i * 4) + 3]);
+
+          // Color
+          if (colorData != nullptr) {
+            const uint8_t* c = colorData + (i * colorStride);
+            if (colorComponentType == TINYGLTF_COMPONENT_TYPE_FLOAT) {
+              const auto* cf = std::bit_cast<const float*>(c);
+              if (colorType == TINYGLTF_TYPE_VEC4) {
+                v.color = glm::vec4(cf[0], cf[1], cf[2], cf[3]);
+              } else {
+                v.color = glm::vec4(cf[0], cf[1], cf[2], 1.0F);
+              }
+            } else if (colorComponentType ==
+                       TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE) {
+              if (colorType == TINYGLTF_TYPE_VEC4) {
+                v.color = glm::vec4(static_cast<float>(c[0]) / 255.0F,
+                                    static_cast<float>(c[1]) / 255.0F,
+                                    static_cast<float>(c[2]) / 255.0F,
+                                    static_cast<float>(c[3]) / 255.0F);
+              } else {
+                v.color = glm::vec4(static_cast<float>(c[0]) / 255.0F,
+                                    static_cast<float>(c[1]) / 255.0F,
+                                    static_cast<float>(c[2]) / 255.0F, 1.0F);
+              }
+            } else if (colorComponentType ==
+                       TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT) {
+              const auto* cs = std::bit_cast<const uint16_t*>(c);
+              if (colorType == TINYGLTF_TYPE_VEC4) {
+                v.color = glm::vec4(static_cast<float>(cs[0]) / 65535.0F,
+                                    static_cast<float>(cs[1]) / 65535.0F,
+                                    static_cast<float>(cs[2]) / 65535.0F,
+                                    static_cast<float>(cs[3]) / 65535.0F);
+              } else {
+                v.color = glm::vec4(static_cast<float>(cs[0]) / 65535.0F,
+                                    static_cast<float>(cs[1]) / 65535.0F,
+                                    static_cast<float>(cs[2]) / 65535.0F, 1.0F);
+              }
+            }
           } else {
             v.color = glm::vec4(1.0F);
           }
+
           vertices.push_back(v);
         }
 
@@ -304,34 +384,20 @@ struct ModelLoader::Impl {
                             mesh.name);
                 break;
             }
-            indices.push_back(prim.vertexOffset + index);
+
+            indices.push_back(index);
           }
         }
 
         mesh.primitives.push_back(prim);
       }
 
-      // Create GPU buffers
+      // Create GPU buffers (CPU-visible for simplicity)
       if (!vertices.empty()) {
         size_t vertexSize = vertices.size() * sizeof(ecs::Vertex);
         mesh.vertexBuffer = factory.CreateBuffer(
-            vertexSize,
-            rhi::BufferUsage::Vertex | rhi::BufferUsage::TransferDst,
-            rhi::MemoryUsage::GPUOnly);
-
-        // Create staging buffer and upload
-        auto staging =
-            factory.CreateBuffer(vertexSize, rhi::BufferUsage::TransferSrc,
-                                 rhi::MemoryUsage::CPUToGPU);
-        void* mapped = staging->Map();
-        std::memcpy(mapped, vertices.data(), vertexSize);
-        staging->Unmap();
-
-        // TODO: Use command buffer to copy staging -> vertex buffer
-        // For now, use CPU-visible buffer
-        mesh.vertexBuffer = factory.CreateBuffer(
             vertexSize, rhi::BufferUsage::Vertex, rhi::MemoryUsage::CPUToGPU);
-        mapped = mesh.vertexBuffer->Map();
+        void* mapped = mesh.vertexBuffer->Map();
         std::memcpy(mapped, vertices.data(), vertexSize);
         mesh.vertexBuffer->Unmap();
       }
@@ -379,10 +445,8 @@ struct ModelLoader::Impl {
 
       // Matrix (overrides TRS if present)
       if (!gltfNode.matrix.empty()) {
-        glm::mat4 matrix;
-        for (int i = 0; i < 16; ++i) {
-          matrix[i / 4][i % 4] = static_cast<float>(gltfNode.matrix[i]);
-        }
+        glm::mat4 matrix{glm::make_mat4(gltfNode.matrix.data())};
+
         // Decompose matrix to TRS
         node.translation = glm::vec3(matrix[3]);
         node.scale = glm::vec3(glm::length(glm::vec3(matrix[0])),

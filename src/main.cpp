@@ -46,7 +46,7 @@ int main() {
   LOG_INFO("Sponza model loaded successfully");
 
   ecs::TransformComponent sponzaTransform{};
-  sponzaTransform.scale = glm::vec3(0.01F);
+  sponzaTransform.scale = glm::vec3(1.0F);
   resource::SceneLoader::Instantiate(registry, *sponzaModel, sponzaTransform);
   LOG_INFO("Sponza instantiated with {} meshes", sponzaModel->meshes.size());
 

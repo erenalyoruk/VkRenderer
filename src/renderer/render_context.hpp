@@ -84,6 +84,10 @@ class RenderContext {
   }
   [[nodiscard]] rhi::Sampler& GetDefaultSampler() { return *defaultSampler_; }
 
+  [[nodiscard]] rhi::Texture* GetDepthTexture() const {
+    return depthTexture_.get();
+  }
+
   void UpdateGlobalUniforms(const GlobalUniforms& uniforms);
 
  private:
@@ -91,6 +95,7 @@ class RenderContext {
   void CreateSyncObjects();
   void CreatePipeline();
   void CreateDescriptors();
+  void CreateDepthBuffer();
 
   rhi::Device& device_;
   rhi::Factory& factory_;
@@ -108,5 +113,6 @@ class RenderContext {
   std::unique_ptr<rhi::PipelineLayout> pipelineLayout_;
   std::unique_ptr<rhi::Pipeline> pipeline_;
   std::unique_ptr<rhi::Sampler> defaultSampler_;
+  std::shared_ptr<rhi::Texture> depthTexture_;
 };
 }  // namespace renderer
