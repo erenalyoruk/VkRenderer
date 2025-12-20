@@ -32,7 +32,28 @@ void RenderSystem::Render(entt::registry& registry, float deltaTime) {
   }
 
   if (!hasCamera) {
-    return;  // No camera to render from
+    // Still need to present even without camera
+    ExecuteRendering(registry, imageIndex);
+
+    auto* cmd = frame.commandBuffer;
+    cmd->End();
+
+    auto* queue = device_.GetQueue(rhi::QueueType::Graphics);
+    std::array<rhi::CommandBuffer*, 1> cmdBuffers = {cmd};
+    std::array<rhi::Semaphore*, 1> waitSemaphores = {
+        frame.imageAvailable.get()};
+    std::array<rhi::Semaphore*, 1> signalSemaphores = {
+        frame.renderFinished.get()};
+
+    queue->Submit(cmdBuffers, waitSemaphores, signalSemaphores,
+                  frame.inFlightFence.get());
+
+    // Present via queue, not swapchain
+    std::array<rhi::Semaphore*, 1> presentWait = {frame.renderFinished.get()};
+    queue->Present(swapchain, imageIndex, presentWait);
+
+    frameCounter_++;
+    return;
   }
 
   // Update global uniforms
@@ -70,7 +91,9 @@ void RenderSystem::Render(entt::registry& registry, float deltaTime) {
   queue->Submit(cmdBuffers, waitSemaphores, signalSemaphores,
                 frame.inFlightFence.get());
 
-  swapchain->Present(imageIndex, frame.renderFinished.get());
+  // Present via queue, not swapchain directly
+  std::array<rhi::Semaphore*, 1> presentWait = {frame.renderFinished.get()};
+  queue->Present(swapchain, imageIndex, presentWait);
 
   frameCounter_++;
 }
@@ -120,12 +143,16 @@ void RenderSystem::FrustumCull(entt::registry& registry) {
 
     // Mark as visible/invisible (could use a tag or flag)
     // For now, we'll just skip rendering in ExecuteRendering
+    (void)visible;  // Suppress unused warning
   }
 }
 
 void RenderSystem::SortRenderables(entt::registry& registry) {
+  (void)this;
+
   // TODO: Sort by material, distance, or render layer for better batching
   // For now, we'll render in entity order
+  (void)registry;
 }
 
 void RenderSystem::ExecuteRendering(entt::registry& registry,
@@ -166,53 +193,55 @@ void RenderSystem::ExecuteRendering(entt::registry& registry,
                    static_cast<float>(swapchain->GetHeight()), 0.0F, 1.0F);
   cmd->SetScissor(0, 0, swapchain->GetWidth(), swapchain->GetHeight());
 
-  // Skip if no pipeline (shaders not compiled yet)
+  // Skip rendering meshes if no pipeline (shaders not compiled yet)
   auto* pipeline = context_.GetPipeline();
-  if (pipeline == nullptr) {
-    cmd->EndRendering();
-    cmd->TransitionTexture(swapchainImage, rhi::ImageLayout::ColorAttachment,
-                           rhi::ImageLayout::Present);
-    return;
-  }
+  if (pipeline != nullptr) {
+    // Bind pipeline
+    cmd->BindPipeline(pipeline);
 
-  // Bind pipeline
-  cmd->BindPipeline(pipeline);
+    // Bind global descriptor set
+    std::array<const rhi::DescriptorSet*, 1> descriptorSets = {
+        frame.globalDescriptorSet.get()};
+    cmd->BindDescriptorSets(pipeline, 0, descriptorSets);
 
-  // Bind global descriptor set
-  std::array<const rhi::DescriptorSet*, 1> descriptorSets = {
-      frame.globalDescriptorSet.get()};
-  cmd->BindDescriptorSets(pipeline, 0, descriptorSets);
+    // Render all entities
+    auto view = registry.view<ecs::MeshComponent, ecs::WorldTransformComponent,
+                              ecs::RenderableComponent>();
 
-  // Render all entities
-  auto view = registry.view<ecs::MeshComponent, ecs::WorldTransformComponent,
-                            ecs::RenderableComponent>();
+    for (auto entity : view) {
+      auto& mesh = view.get<ecs::MeshComponent>(entity);
+      auto& world = view.get<ecs::WorldTransformComponent>(entity);
 
-  for (auto entity : view) {
-    auto& mesh = view.get<ecs::MeshComponent>(entity);
-    auto& world = view.get<ecs::WorldTransformComponent>(entity);
+      if (!mesh.vertexBuffer || !mesh.indexBuffer) {
+        continue;  // Skip invalid meshes
+      }
 
-    // Push constants for object transform
-    ObjectUniforms objUniforms{};
-    objUniforms.model = world.matrix;
-    objUniforms.normalMatrix =
-        glm::transpose(glm::inverse(glm::mat4(glm::mat3(world.matrix))));
+      // Push constants for object transform
+      ObjectUniforms objUniforms{};
+      objUniforms.model = world.matrix;
+      objUniforms.normalMatrix =
+          glm::transpose(glm::inverse(glm::mat4(glm::mat3(world.matrix))));
 
-    std::span<const std::byte> pushData{
-        std::bit_cast<const std::byte*>(&objUniforms), sizeof(ObjectUniforms)};
-    cmd->PushConstants(pipeline, 0, pushData);
+      std::span<const std::byte> pushData{
+          std::bit_cast<const std::byte*>(&objUniforms),
+          sizeof(ObjectUniforms)};
+      cmd->PushConstants(pipeline, 0, pushData);
 
-    // Bind vertex and index buffers
-    std::array<const rhi::Buffer*, 1> vertexBuffers = {mesh.vertexBuffer.get()};
-    std::array<uint64_t, 1> offsets = {0};
-    cmd->BindVertexBuffers(0, vertexBuffers, offsets);
-    cmd->BindIndexBuffer(*mesh.indexBuffer, 0, true);  // true = 32-bit indices
+      // Bind vertex and index buffers
+      std::array<const rhi::Buffer*, 1> vertexBuffers = {
+          mesh.vertexBuffer.get()};
+      std::array<uint64_t, 1> offsets = {0};
+      cmd->BindVertexBuffers(0, vertexBuffers, offsets);
+      cmd->BindIndexBuffer(*mesh.indexBuffer, 0,
+                           true);  // true = 32-bit indices
 
-    // Draw submeshes
-    for (const auto& submesh : mesh.subMeshes) {
-      cmd->DrawIndexed(submesh.indexCount, 1, submesh.indexOffset,
-                       static_cast<int32_t>(submesh.vertexOffset), 0);
-      stats_.drawCalls++;
-      stats_.triangles += submesh.indexCount / 3;
+      // Draw submeshes
+      for (const auto& submesh : mesh.subMeshes) {
+        cmd->DrawIndexed(submesh.indexCount, 1, submesh.indexOffset,
+                         static_cast<int32_t>(submesh.vertexOffset), 0);
+        stats_.drawCalls++;
+        stats_.triangles += submesh.indexCount / 3;
+      }
     }
   }
 

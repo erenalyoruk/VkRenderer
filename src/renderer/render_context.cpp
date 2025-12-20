@@ -1,9 +1,14 @@
-#include "render_context.hpp"
+#include "renderer/render_context.hpp"
 
 #include <array>
 
-namespace renderer {
+#include "ecs/components.hpp"
+#include "logger.hpp"
+#include "rhi/shader_utils.hpp"
 
+#undef CreateSemaphore  // Windows macro conflict
+
+namespace renderer {
 RenderContext::RenderContext(rhi::Device& device, rhi::Factory& factory)
     : device_{device}, factory_{factory} {
   CreateDescriptors();
@@ -63,13 +68,16 @@ void RenderContext::CreateDescriptors() {
 }
 
 void RenderContext::CreatePipeline() {
-  // TODO: Load compiled SPIR-V shaders
-  // For now, we'll skip shader loading and pipeline creation
-  // You need to compile the shaders first
+  // Load compiled shaders
+  auto vertShader = rhi::CreateShaderFromFile(
+      factory_, "assets/shaders/simple.vert.spv", rhi::ShaderStage::Vertex);
+  auto fragShader = rhi::CreateShaderFromFile(
+      factory_, "assets/shaders/simple.frag.spv", rhi::ShaderStage::Fragment);
 
-  // Load shaders - you'll need to compile .vert/.frag to .spv first
-  // auto vertShader = factory_.CreateShader(...);
-  // auto fragShader = factory_.CreateShader(...);
+  if (!vertShader || !fragShader) {
+    LOG_ERROR("Failed to load shaders! Make sure .spv files exist.");
+    return;
+  }
 
   // Pipeline layout with push constants for model matrix
   std::array<rhi::DescriptorSetLayout*, 2> layouts = {
@@ -85,8 +93,33 @@ void RenderContext::CreatePipeline() {
 
   pipelineLayout_ = factory_.CreatePipelineLayout(layouts, pushConstants);
 
-  // Graphics pipeline will be created when we have compiled shaders
-  // For now, leave it null - you'll need to add shader compilation
+  // Vertex input
+  auto bindings = ecs::Vertex::GetBindings();
+  auto attributes = ecs::Vertex::GetAttributes();
+
+  // Get swapchain format
+  auto* swapchain = device_.GetSwapchain();
+  rhi::Format colorFormat = swapchain->GetImages()[0]->GetFormat();
+
+  std::array<rhi::Format, 1> colorFormats = {colorFormat};
+
+  rhi::GraphicsPipelineDesc pipelineDesc{
+      .vertexShader = vertShader.get(),
+      .fragmentShader = fragShader.get(),
+      .layout = pipelineLayout_.get(),
+      .vertexBindings = bindings,
+      .vertexAttributes = attributes,
+      .colorFormats = colorFormats,
+      .depthFormat = rhi::Format::D32Sfloat,
+  };
+
+  pipeline_ = factory_.CreateGraphicsPipeline(pipelineDesc);
+
+  if (!pipeline_) {
+    LOG_ERROR("Failed to create graphics pipeline!");
+  } else {
+    LOG_INFO("Graphics pipeline created successfully.");
+  }
 }
 
 void RenderContext::BeginFrame(uint32_t frameIndex) {
@@ -97,7 +130,7 @@ void RenderContext::BeginFrame(uint32_t frameIndex) {
   frame.inFlightFence->Reset();
 }
 
-void RenderContext::EndFrame(uint32_t frameIndex) {
+void RenderContext::EndFrame(uint32_t /*frameIndex*/) {
   // Frame synchronization handled by caller
 }
 
@@ -106,7 +139,6 @@ void RenderContext::UpdateGlobalUniforms(const GlobalUniforms& uniforms) {
   void* data = frame.globalUniformBuffer->Map();
   std::memcpy(data, &uniforms, sizeof(GlobalUniforms));
   frame.globalUniformBuffer->Unmap();
-
-  // Descriptor is already bound during CreateFrameResources
 }
+
 }  // namespace renderer
