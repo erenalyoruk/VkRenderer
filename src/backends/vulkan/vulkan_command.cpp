@@ -413,7 +413,9 @@ std::unique_ptr<VulkanCommandPool> VulkanCommandPool::Create(
 
 void VulkanCommandPool::Reset() {
   device_.resetCommandPool(commandPool_.get());
-  allocatedBuffers_.clear();
+  // DO NOT CLEAR allocatedBuffers_ HERE! It would invalidate existing command
+  // buffers.
+  // allocatedBuffers_.clear();
 }
 
 rhi::CommandBuffer* VulkanCommandPool::AllocateCommandBuffer() {

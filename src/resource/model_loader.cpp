@@ -339,7 +339,7 @@ struct ModelLoader::Impl {
       if (!indices.empty()) {
         size_t indexSize = indices.size() * sizeof(uint32_t);
         mesh.indexBuffer = factory.CreateBuffer(
-            indexSize, rhi::BufferUsage::Vertex, rhi::MemoryUsage::CPUToGPU);
+            indexSize, rhi::BufferUsage::Index, rhi::MemoryUsage::CPUToGPU);
         void* mapped = mesh.indexBuffer->Map();
         std::memcpy(mapped, indices.data(), indexSize);
         mesh.indexBuffer->Unmap();

@@ -9,18 +9,33 @@
 #undef CreateSemaphore  // Windows macro conflict
 
 namespace renderer {
+
 RenderContext::RenderContext(rhi::Device& device, rhi::Factory& factory)
     : device_{device}, factory_{factory} {
   CreateDescriptors();
   CreatePipeline();
+  CreateSyncObjects();
   CreateFrameResources();
+}
+
+void RenderContext::CreateSyncObjects() {
+  // Create semaphores per swapchain image
+  uint32_t imageCount = device_.GetSwapchain()->GetImageCount();
+
+  imageAvailableSemaphores_.reserve(imageCount);
+  renderFinishedSemaphores_.reserve(imageCount);
+
+  for (uint32_t i = 0; i < imageCount; ++i) {
+    imageAvailableSemaphores_.push_back(factory_.CreateSemaphore());
+    renderFinishedSemaphores_.push_back(factory_.CreateSemaphore());
+  }
+
+  LOG_DEBUG("Created {} semaphore pairs for swapchain images", imageCount);
 }
 
 void RenderContext::CreateFrameResources() {
   for (auto& frame : frames_) {
     frame.inFlightFence = factory_.CreateFence(true);
-    frame.imageAvailable = factory_.CreateSemaphore();
-    frame.renderFinished = factory_.CreateSemaphore();
 
     frame.commandPool = factory_.CreateCommandPool(rhi::QueueType::Graphics);
     frame.commandBuffer = frame.commandPool->AllocateCommandBuffer();
@@ -30,7 +45,7 @@ void RenderContext::CreateFrameResources() {
         factory_.CreateBuffer(sizeof(GlobalUniforms), rhi::BufferUsage::Uniform,
                               rhi::MemoryUsage::CPUToGPU);
 
-    // Object uniform buffer (allocate space for many objects)
+    // Object uniform buffer
     frame.objectUniformBuffer = factory_.CreateBuffer(
         sizeof(ObjectUniforms) * 10000, rhi::BufferUsage::Uniform,
         rhi::MemoryUsage::CPUToGPU);
@@ -39,20 +54,17 @@ void RenderContext::CreateFrameResources() {
     frame.globalDescriptorSet =
         factory_.CreateDescriptorSet(globalDescriptorLayout_.get());
 
-    // Bind global uniform buffer to descriptor set
     frame.globalDescriptorSet->BindBuffer(0, frame.globalUniformBuffer.get(), 0,
                                           sizeof(GlobalUniforms));
   }
 }
 
 void RenderContext::CreateDescriptors() {
-  // Global descriptor layout (set 0)
   std::array<rhi::DescriptorBinding, 1> globalBindings = {{
       {.binding = 0, .type = rhi::DescriptorType::UniformBuffer, .count = 1},
   }};
   globalDescriptorLayout_ = factory_.CreateDescriptorSetLayout(globalBindings);
 
-  // Material descriptor layout (set 1)
   std::array<rhi::DescriptorBinding, 4> materialBindings = {{
       {.binding = 0, .type = rhi::DescriptorType::UniformBuffer, .count = 1},
       {.binding = 1, .type = rhi::DescriptorType::SampledImage, .count = 1},
@@ -62,13 +74,11 @@ void RenderContext::CreateDescriptors() {
   materialDescriptorLayout_ =
       factory_.CreateDescriptorSetLayout(materialBindings);
 
-  // Default sampler
   defaultSampler_ = factory_.CreateSampler(
       rhi::Filter::Linear, rhi::Filter::Linear, rhi::AddressMode::Repeat);
 }
 
 void RenderContext::CreatePipeline() {
-  // Load compiled shaders
   auto vertShader = rhi::CreateShaderFromFile(
       factory_, "assets/shaders/simple.vert.spv", rhi::ShaderStage::Vertex);
   auto fragShader = rhi::CreateShaderFromFile(
@@ -79,7 +89,6 @@ void RenderContext::CreatePipeline() {
     return;
   }
 
-  // Pipeline layout with push constants for model matrix
   std::array<rhi::DescriptorSetLayout*, 2> layouts = {
       globalDescriptorLayout_.get(),
       materialDescriptorLayout_.get(),
@@ -93,11 +102,9 @@ void RenderContext::CreatePipeline() {
 
   pipelineLayout_ = factory_.CreatePipelineLayout(layouts, pushConstants);
 
-  // Vertex input
   auto bindings = ecs::Vertex::GetBindings();
   auto attributes = ecs::Vertex::GetAttributes();
 
-  // Get swapchain format
   auto* swapchain = device_.GetSwapchain();
   rhi::Format colorFormat = swapchain->GetImages()[0]->GetFormat();
 
@@ -124,15 +131,14 @@ void RenderContext::CreatePipeline() {
 
 void RenderContext::BeginFrame(uint32_t frameIndex) {
   currentFrame_ = frameIndex % kMaxFramesInFlight;
-  auto& frame = frames_[currentFrame_];  // NOLINT
+  auto& frame = frames_[currentFrame_]; // NOLINT
 
   frame.inFlightFence->Wait();
   frame.inFlightFence->Reset();
+  frame.commandPool->Reset();
 }
 
-void RenderContext::EndFrame(uint32_t /*frameIndex*/) {
-  // Frame synchronization handled by caller
-}
+void RenderContext::EndFrame(uint32_t /*frameIndex*/) {}
 
 void RenderContext::UpdateGlobalUniforms(const GlobalUniforms& uniforms) {
   auto& frame = GetCurrentFrame();

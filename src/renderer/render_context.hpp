@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <vector>
 
 #include <glm/glm.hpp>
 
@@ -12,7 +13,6 @@
 #include "rhi/pipeline.hpp"
 #include "rhi/sampler.hpp"
 #include "rhi/sync.hpp"
-#include "rhi/texture.hpp"  // IWYU pragma: export
 
 namespace renderer {
 constexpr uint32_t kMaxFramesInFlight = 2;
@@ -38,14 +38,12 @@ struct MaterialUniforms {
 };
 
 struct FrameData {
-  // Synchronization
+  // Synchronization - per frame in flight
   std::unique_ptr<rhi::Fence> inFlightFence;
-  std::unique_ptr<rhi::Semaphore> imageAvailable;
-  std::unique_ptr<rhi::Semaphore> renderFinished;
 
   // Command buffers
   std::unique_ptr<rhi::CommandPool> commandPool;
-  rhi::CommandBuffer* commandBuffer{nullptr};  // Owned by commandPool
+  rhi::CommandBuffer* commandBuffer{nullptr};
 
   // Uniform buffers
   std::unique_ptr<rhi::Buffer> globalUniformBuffer;
@@ -67,6 +65,16 @@ class RenderContext {
   }
   [[nodiscard]] uint32_t GetFrameIndex() const { return currentFrame_; }
 
+  // Get semaphores indexed by swapchain image
+  [[nodiscard]] rhi::Semaphore* GetImageAvailableSemaphore(
+      uint32_t imageIndex) {
+    return imageAvailableSemaphores_[imageIndex].get();
+  }
+  [[nodiscard]] rhi::Semaphore* GetRenderFinishedSemaphore(
+      uint32_t imageIndex) {
+    return renderFinishedSemaphores_[imageIndex].get();
+  }
+
   // Resource access
   [[nodiscard]] rhi::Device& GetDevice() { return device_; }
   [[nodiscard]] rhi::Factory& GetFactory() { return factory_; }
@@ -80,6 +88,7 @@ class RenderContext {
 
  private:
   void CreateFrameResources();
+  void CreateSyncObjects();
   void CreatePipeline();
   void CreateDescriptors();
 
@@ -88,6 +97,10 @@ class RenderContext {
 
   std::array<FrameData, kMaxFramesInFlight> frames_;
   uint32_t currentFrame_{0};
+
+  // Semaphores per swapchain image (not per frame!)
+  std::vector<std::unique_ptr<rhi::Semaphore>> imageAvailableSemaphores_;
+  std::vector<std::unique_ptr<rhi::Semaphore>> renderFinishedSemaphores_;
 
   // Shared resources
   std::unique_ptr<rhi::DescriptorSetLayout> globalDescriptorLayout_;

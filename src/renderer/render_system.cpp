@@ -10,17 +10,25 @@ RenderSystem::RenderSystem(rhi::Device& device, rhi::Factory& factory)
 void RenderSystem::Render(entt::registry& registry, float deltaTime) {
   stats_ = {};
 
-  // Get swapchain image
   auto* swapchain = device_.GetSwapchain();
+
+  // Begin frame (waits for fence, resets command pool)
+  context_.BeginFrame(frameCounter_);
+
   auto& frame = context_.GetCurrentFrame();
 
-  uint32_t imageIndex = swapchain->AcquireNextImage(frame.imageAvailable.get());
-  context_.BeginFrame(frameCounter_);
+  // Use semaphore indexed by current frame for acquire
+  // We'll get the actual image index back
+  uint32_t semaphoreIndex = frameCounter_ % swapchain->GetImageCount();
+  auto* imageAvailableSem = context_.GetImageAvailableSemaphore(semaphoreIndex);
+
+  uint32_t imageIndex = swapchain->AcquireNextImage(imageAvailableSem);
+
+  // Use semaphore indexed by acquired image for rendering/present
+  auto* renderFinishedSem = context_.GetRenderFinishedSemaphore(imageIndex);
 
   // Update systems
   UpdateTransforms(registry);
-  FrustumCull(registry);
-  SortRenderables(registry);
 
   // Find active camera
   auto cameraView = registry.view<ecs::CameraComponent, ecs::MainCameraTag>();
@@ -31,75 +39,48 @@ void RenderSystem::Render(entt::registry& registry, float deltaTime) {
     break;
   }
 
-  if (!hasCamera) {
-    // Still need to present even without camera
-    ExecuteRendering(registry, imageIndex);
+  // Update global uniforms if we have a camera
+  if (hasCamera) {
+    GlobalUniforms globals{};
+    globals.viewProjection = activeCamera_->projection * activeCamera_->view;
+    globals.time = static_cast<float>(frameCounter_) * deltaTime;
 
-    auto* cmd = frame.commandBuffer;
-    cmd->End();
+    auto lightView = registry.view<ecs::DirectionalLightComponent>();
+    for (auto entity : lightView) {
+      auto& light = lightView.get<ecs::DirectionalLightComponent>(entity);
+      globals.lightDirection = glm::vec4(light.direction, 0.0F);
+      globals.lightColor = glm::vec4(light.color, 1.0F);
+      globals.lightIntensity = light.intensity;
+      break;
+    }
 
-    auto* queue = device_.GetQueue(rhi::QueueType::Graphics);
-    std::array<rhi::CommandBuffer*, 1> cmdBuffers = {cmd};
-    std::array<rhi::Semaphore*, 1> waitSemaphores = {
-        frame.imageAvailable.get()};
-    std::array<rhi::Semaphore*, 1> signalSemaphores = {
-        frame.renderFinished.get()};
-
-    queue->Submit(cmdBuffers, waitSemaphores, signalSemaphores,
-                  frame.inFlightFence.get());
-
-    // Present via queue, not swapchain
-    std::array<rhi::Semaphore*, 1> presentWait = {frame.renderFinished.get()};
-    queue->Present(swapchain, imageIndex, presentWait);
-
-    frameCounter_++;
-    return;
+    context_.UpdateGlobalUniforms(globals);
   }
-
-  // Update global uniforms
-  GlobalUniforms globals{};
-  globals.viewProjection = activeCamera_->projection * activeCamera_->view;
-  globals.time = static_cast<float>(frameCounter_) * deltaTime;
-
-  // Get directional light
-  auto lightView = registry.view<ecs::DirectionalLightComponent>();
-  for (auto entity : lightView) {
-    auto& light = lightView.get<ecs::DirectionalLightComponent>(entity);
-    globals.lightDirection = glm::vec4(light.direction, 0.0F);
-    globals.lightColor = glm::vec4(light.color, 1.0F);
-    globals.lightIntensity = light.intensity;
-    break;  // Use first light
-  }
-
-  context_.UpdateGlobalUniforms(globals);
 
   // Record commands
   ExecuteRendering(registry, imageIndex);
 
-  // Submit and present
+  // Submit
   auto* cmd = frame.commandBuffer;
   cmd->End();
 
   auto* queue = device_.GetQueue(rhi::QueueType::Graphics);
 
-  // Submit takes spans
   std::array<rhi::CommandBuffer*, 1> cmdBuffers = {cmd};
-  std::array<rhi::Semaphore*, 1> waitSemaphores = {frame.imageAvailable.get()};
-  std::array<rhi::Semaphore*, 1> signalSemaphores = {
-      frame.renderFinished.get()};
+  std::array<rhi::Semaphore*, 1> waitSemaphores = {imageAvailableSem};
+  std::array<rhi::Semaphore*, 1> signalSemaphores = {renderFinishedSem};
 
   queue->Submit(cmdBuffers, waitSemaphores, signalSemaphores,
                 frame.inFlightFence.get());
 
-  // Present via queue, not swapchain directly
-  std::array<rhi::Semaphore*, 1> presentWait = {frame.renderFinished.get()};
+  // Present
+  std::array<rhi::Semaphore*, 1> presentWait = {renderFinishedSem};
   queue->Present(swapchain, imageIndex, presentWait);
 
   frameCounter_++;
 }
 
 void RenderSystem::UpdateTransforms(entt::registry& registry) {
-  // Update world transforms from local transforms
   auto view =
       registry.view<ecs::TransformComponent, ecs::WorldTransformComponent>();
 
@@ -109,51 +90,11 @@ void RenderSystem::UpdateTransforms(entt::registry& registry) {
     world.matrix = local.GetMatrix();
     stats_.entitiesProcessed++;
   }
-
-  // TODO: Handle hierarchy (parent-child relationships)
 }
 
-void RenderSystem::FrustumCull(entt::registry& registry) {
-  if (activeCamera_ == nullptr) {
-    return;
-  }
+void RenderSystem::FrustumCull(entt::registry& /*registry*/) {}
 
-  auto view =
-      registry.view<ecs::WorldTransformComponent, ecs::BoundingBoxComponent,
-                    ecs::RenderableComponent>();
-
-  for (auto entity : view) {
-    auto& world = view.get<ecs::WorldTransformComponent>(entity);
-    auto& bounds = view.get<ecs::BoundingBoxComponent>(entity);
-
-    // Transform bounding box center to world space
-    glm::vec4 center = world.matrix * glm::vec4(bounds.GetCenter(), 1.0F);
-    float radius = glm::length(bounds.GetExtents());
-
-    // Simple sphere-frustum test
-    bool visible = true;
-    for (const auto& plane : activeCamera_->frustumPlanes) {
-      float distance = glm::dot(plane, center) + plane.w;
-      if (distance < -radius) {
-        visible = false;
-        stats_.culledObjects++;
-        break;
-      }
-    }
-
-    // Mark as visible/invisible (could use a tag or flag)
-    // For now, we'll just skip rendering in ExecuteRendering
-    (void)visible;  // Suppress unused warning
-  }
-}
-
-void RenderSystem::SortRenderables(entt::registry& registry) {
-  (void)this;
-
-  // TODO: Sort by material, distance, or render layer for better batching
-  // For now, we'll render in entity order
-  (void)registry;
-}
+void RenderSystem::SortRenderables(entt::registry& /*registry*/) {}
 
 void RenderSystem::ExecuteRendering(entt::registry& registry,
                                     uint32_t imageIndex) {
@@ -166,17 +107,15 @@ void RenderSystem::ExecuteRendering(entt::registry& registry,
 
   cmd->Begin();
 
-  // Transition swapchain image to color attachment
   cmd->TransitionTexture(swapchainImage, rhi::ImageLayout::Undefined,
                          rhi::ImageLayout::ColorAttachment);
 
-  // Begin rendering
   rhi::RenderingAttachment colorAttachment{
       .texture = swapchainImage,
       .layout = rhi::ImageLayout::ColorAttachment,
       .loadOp = rhi::LoadOp::Clear,
       .storeOp = rhi::StoreOp::Store,
-      .clearValue = {0.1F, 0.1F, 0.1F, 1.0F},
+      .clearValue = {0.2F, 0.3F, 0.4F, 1.0F},
   };
 
   rhi::RenderingInfo renderInfo{
@@ -188,23 +127,18 @@ void RenderSystem::ExecuteRendering(entt::registry& registry,
 
   cmd->BeginRendering(renderInfo);
 
-  // Set viewport and scissor
   cmd->SetViewport(0, 0, static_cast<float>(swapchain->GetWidth()),
                    static_cast<float>(swapchain->GetHeight()), 0.0F, 1.0F);
   cmd->SetScissor(0, 0, swapchain->GetWidth(), swapchain->GetHeight());
 
-  // Skip rendering meshes if no pipeline (shaders not compiled yet)
   auto* pipeline = context_.GetPipeline();
   if (pipeline != nullptr) {
-    // Bind pipeline
     cmd->BindPipeline(pipeline);
 
-    // Bind global descriptor set
     std::array<const rhi::DescriptorSet*, 1> descriptorSets = {
         frame.globalDescriptorSet.get()};
     cmd->BindDescriptorSets(pipeline, 0, descriptorSets);
 
-    // Render all entities
     auto view = registry.view<ecs::MeshComponent, ecs::WorldTransformComponent,
                               ecs::RenderableComponent>();
 
@@ -213,10 +147,9 @@ void RenderSystem::ExecuteRendering(entt::registry& registry,
       auto& world = view.get<ecs::WorldTransformComponent>(entity);
 
       if (!mesh.vertexBuffer || !mesh.indexBuffer) {
-        continue;  // Skip invalid meshes
+        continue;
       }
 
-      // Push constants for object transform
       ObjectUniforms objUniforms{};
       objUniforms.model = world.matrix;
       objUniforms.normalMatrix =
@@ -227,15 +160,12 @@ void RenderSystem::ExecuteRendering(entt::registry& registry,
           sizeof(ObjectUniforms)};
       cmd->PushConstants(pipeline, 0, pushData);
 
-      // Bind vertex and index buffers
       std::array<const rhi::Buffer*, 1> vertexBuffers = {
           mesh.vertexBuffer.get()};
       std::array<uint64_t, 1> offsets = {0};
       cmd->BindVertexBuffers(0, vertexBuffers, offsets);
-      cmd->BindIndexBuffer(*mesh.indexBuffer, 0,
-                           true);  // true = 32-bit indices
+      cmd->BindIndexBuffer(*mesh.indexBuffer, 0, true);
 
-      // Draw submeshes
       for (const auto& submesh : mesh.subMeshes) {
         cmd->DrawIndexed(submesh.indexCount, 1, submesh.indexOffset,
                          static_cast<int32_t>(submesh.vertexOffset), 0);
@@ -247,7 +177,6 @@ void RenderSystem::ExecuteRendering(entt::registry& registry,
 
   cmd->EndRendering();
 
-  // Transition swapchain image to present
   cmd->TransitionTexture(swapchainImage, rhi::ImageLayout::ColorAttachment,
                          rhi::ImageLayout::Present);
 }
