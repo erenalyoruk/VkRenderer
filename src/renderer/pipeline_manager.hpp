@@ -2,8 +2,10 @@
 
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <string>
 #include <unordered_map>
+#include <vector>
 
 #include "rhi/device.hpp"
 #include "rhi/factory.hpp"
@@ -29,6 +31,10 @@ struct PipelineConfig {
   bool doubleSided{false};
   bool wireframe{false};
   bool blendEnabled{false};
+
+  // Optional custom vertex layout (for skybox which only uses position)
+  std::optional<std::vector<rhi::VertexBinding>> vertexBindings;
+  std::optional<std::vector<rhi::VertexAttribute>> vertexAttributes;
 };
 
 class PipelineManager {

@@ -62,6 +62,20 @@ void PipelineManager::Initialize(rhi::DescriptorSetLayout* globalLayout,
                      .blendEnabled = false,
                  });
 
+  // Skybox only uses position
+  std::vector<rhi::VertexBinding> skyboxBindings = {{
+      .binding = 0,
+      .stride = sizeof(ecs::Vertex),
+      .inputRate = rhi::VertexInputRate::Vertex,
+  }};
+
+  std::vector<rhi::VertexAttribute> skyboxAttributes = {{
+      .location = 0,
+      .binding = 0,
+      .format = rhi::Format::R32G32B32Sfloat,
+      .offset = offsetof(ecs::Vertex, position),
+  }};
+
   CreatePipeline(PipelineType::Skybox,
                  {
                      .vertexShaderPath = "assets/shaders/skybox.vert.spv",
@@ -72,6 +86,8 @@ void PipelineManager::Initialize(rhi::DescriptorSetLayout* globalLayout,
                      .doubleSided = false,
                      .wireframe = false,
                      .blendEnabled = false,
+                     .vertexBindings = skyboxBindings,
+                     .vertexAttributes = skyboxAttributes,
                  });
 }
 
@@ -88,8 +104,17 @@ void PipelineManager::CreatePipeline(PipelineType type,
     return;
   }
 
-  auto bindings = ecs::Vertex::GetBindings();
-  auto attributes = ecs::Vertex::GetAttributes();
+  // Use custom vertex layout if provided, otherwise use default Vertex
+  std::vector<rhi::VertexBinding> bindings;
+  std::vector<rhi::VertexAttribute> attributes;
+
+  if (config.vertexBindings && config.vertexAttributes) {
+    bindings = *config.vertexBindings;
+    attributes = *config.vertexAttributes;
+  } else {
+    bindings = ecs::Vertex::GetBindings();
+    attributes = ecs::Vertex::GetAttributes();
+  }
 
   auto* swapchain = device_.GetSwapchain();
   rhi::Format colorFormat = swapchain->GetImages()[0]->GetFormat();

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <string>
 
 #include "rhi/buffer.hpp"
 #include "rhi/descriptor.hpp"
@@ -26,6 +27,8 @@ class SkyboxIBL {
   [[nodiscard]] rhi::DescriptorSetLayout* GetIBLDescriptorLayout() const {
     return iblDescriptorLayout_.get();
   }
+
+  [[nodiscard]] bool LoadHDREnvironment(const std::string& hdrPath);
 
   [[nodiscard]] bool IsLoaded() const { return skyboxCubemap_ != nullptr; }
 

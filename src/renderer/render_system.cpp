@@ -2,10 +2,17 @@
 
 #include <unordered_set>
 
+#include "logger.hpp"
+
 namespace renderer {
 
 RenderSystem::RenderSystem(rhi::Device& device, rhi::Factory& factory)
-    : device_{device}, factory_{factory}, context_{device, factory} {}
+    : device_{device}, factory_{factory}, context_{device, factory} {
+  if (!context_.GetSkyboxIBL().LoadHDREnvironment(
+          "assets/textures/skybox.hdr")) {
+    LOG_ERROR("Failed to load HDR environment map for skybox IBL.");
+  }
+}
 
 void RenderSystem::Render(entt::registry& registry, float deltaTime) {
   auto* swapchain = device_.GetSwapchain();

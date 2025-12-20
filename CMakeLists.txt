@@ -104,3 +104,10 @@ add_custom_command(
           "${CMAKE_CURRENT_SOURCE_DIR}/assets/models"
           "$<TARGET_FILE_DIR:VkRenderer>/assets/models"
 )
+
+add_custom_command(
+  TARGET VkRenderer POST_BUILD
+  COMMAND ${CMAKE_COMMAND} -E copy_directory
+          "${CMAKE_CURRENT_SOURCE_DIR}/assets/textures"
+          "$<TARGET_FILE_DIR:VkRenderer>/assets/textures"
+)
