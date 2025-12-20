@@ -10,14 +10,33 @@
 #include "rhi/texture.hpp"
 
 namespace rhi {
+
+/**
+ * @brief Load operation for attachments
+ */
+enum class LoadOp : uint8_t {
+  Load,      // Load previous contents
+  Clear,     // Clear to a value
+  DontCare,  // Don't care about previous contents
+};
+
+/**
+ * @brief Store operation for attachments
+ */
+enum class StoreOp : uint8_t {
+  Store,     // Store the results
+  DontCare,  // Don't care about storing
+};
+
 /**
  * @brief Describes a color attachment for rendering
  */
 struct RenderingAttachment {
   Texture* texture{nullptr};
   ImageLayout layout{ImageLayout::ColorAttachment};
-  bool clear{false};
-  std::array<float, 4> clearColor{0.0F, 0.0F, 0.0F, 1.0F};
+  LoadOp loadOp{LoadOp::Clear};
+  StoreOp storeOp{StoreOp::Store};
+  std::array<float, 4> clearValue{0.0F, 0.0F, 0.0F, 1.0F};
 };
 
 /**

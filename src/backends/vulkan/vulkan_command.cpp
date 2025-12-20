@@ -87,17 +87,40 @@ void VulkanCommandBuffer::BeginRendering(const rhi::RenderingInfo& info) {
   std::vector<vk::RenderingAttachmentInfo> colorAttachments;
   for (const auto& attachment : info.colorAttachments) {
     auto* vkTexture = std::bit_cast<VulkanTexture*>(attachment.texture);
+
+    vk::AttachmentLoadOp loadOp = vk::AttachmentLoadOp::eDontCare;
+    switch (attachment.loadOp) {
+      case rhi::LoadOp::Load:
+        loadOp = vk::AttachmentLoadOp::eLoad;
+        break;
+      case rhi::LoadOp::Clear:
+        loadOp = vk::AttachmentLoadOp::eClear;
+        break;
+      case rhi::LoadOp::DontCare:
+        loadOp = vk::AttachmentLoadOp::eDontCare;
+        break;
+    }
+
+    vk::AttachmentStoreOp storeOp = vk::AttachmentStoreOp::eStore;
+    switch (attachment.storeOp) {
+      case rhi::StoreOp::Store:
+        storeOp = vk::AttachmentStoreOp::eStore;
+        break;
+      case rhi::StoreOp::DontCare:
+        storeOp = vk::AttachmentStoreOp::eDontCare;
+        break;
+    }
+
     vk::RenderingAttachmentInfo colorAttachment{
         .imageView = vkTexture->GetImageView(),
         .imageLayout = ToVkLayout(attachment.layout),
-        .loadOp = attachment.clear ? vk::AttachmentLoadOp::eClear
-                                   : vk::AttachmentLoadOp::eLoad,
-        .storeOp = vk::AttachmentStoreOp::eStore,
+        .loadOp = loadOp,
+        .storeOp = storeOp,
         .clearValue =
             vk::ClearValue{
                 .color = vk::ClearColorValue{std::array{
-                    attachment.clearColor[0], attachment.clearColor[1],
-                    attachment.clearColor[2], attachment.clearColor[3]}}},
+                    attachment.clearValue[0], attachment.clearValue[1],
+                    attachment.clearValue[2], attachment.clearValue[3]}}},
     };
     colorAttachments.push_back(colorAttachment);
   }
@@ -106,12 +129,35 @@ void VulkanCommandBuffer::BeginRendering(const rhi::RenderingInfo& info) {
   if (info.depthAttachment != nullptr) {
     auto* vkTexture =
         std::bit_cast<VulkanTexture*>(info.depthAttachment->texture);
+
+    vk::AttachmentLoadOp loadOp = vk::AttachmentLoadOp::eDontCare;
+    switch (info.depthAttachment->loadOp) {
+      case rhi::LoadOp::Load:
+        loadOp = vk::AttachmentLoadOp::eLoad;
+        break;
+      case rhi::LoadOp::Clear:
+        loadOp = vk::AttachmentLoadOp::eClear;
+        break;
+      case rhi::LoadOp::DontCare:
+        loadOp = vk::AttachmentLoadOp::eDontCare;
+        break;
+    }
+
+    vk::AttachmentStoreOp storeOp = vk::AttachmentStoreOp::eStore;
+    switch (info.depthAttachment->storeOp) {
+      case rhi::StoreOp::Store:
+        storeOp = vk::AttachmentStoreOp::eStore;
+        break;
+      case rhi::StoreOp::DontCare:
+        storeOp = vk::AttachmentStoreOp::eDontCare;
+        break;
+    }
+
     depthAttachment = {
         .imageView = vkTexture->GetImageView(),
         .imageLayout = ToVkLayout(info.depthAttachment->layout),
-        .loadOp = info.depthAttachment->clear ? vk::AttachmentLoadOp::eClear
-                                              : vk::AttachmentLoadOp::eLoad,
-        .storeOp = vk::AttachmentStoreOp::eStore,
+        .loadOp = loadOp,
+        .storeOp = storeOp,
         .clearValue =
             vk::ClearValue{.depthStencil = {.depth = 1.0F, .stencil = 0}},
     };

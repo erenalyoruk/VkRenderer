@@ -13,6 +13,16 @@ enum class ShaderStage : uint8_t {
   Compute,
 };
 
+constexpr ShaderStage operator|(ShaderStage a, ShaderStage b) {
+  return static_cast<ShaderStage>(static_cast<uint8_t>(a) |
+                                  static_cast<uint8_t>(b));
+}
+
+constexpr ShaderStage operator&(ShaderStage a, ShaderStage b) {
+  return static_cast<ShaderStage>(static_cast<uint8_t>(a) &
+                                  static_cast<uint8_t>(b));
+}
+
 /**
  * @brief Abstract base class for shaders
  */
