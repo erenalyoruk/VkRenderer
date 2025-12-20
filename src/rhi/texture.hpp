@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <span>
 
 #include "rhi/types.hpp"
@@ -13,6 +14,27 @@ enum class TextureUsage : uint8_t {
   Storage = 1 << 1,                 // Storage texture
   ColorAttachment = 1 << 2,         // Color attachment
   DepthStencilAttachment = 1 << 3,  // Depth-stencil attachment
+};
+
+constexpr TextureUsage operator|(TextureUsage a, TextureUsage b) {
+  return static_cast<TextureUsage>(static_cast<uint8_t>(a) |
+                                   static_cast<uint8_t>(b));
+}
+
+constexpr TextureUsage operator&(TextureUsage a, TextureUsage b) {
+  return static_cast<TextureUsage>(static_cast<uint8_t>(a) &
+                                   static_cast<uint8_t>(b));
+}
+
+enum class ImageLayout : uint8_t {
+  Undefined,
+  General,
+  ColorAttachment,
+  DepthStencilAttachment,
+  ShaderReadOnly,
+  TransferSrc,
+  TransferDst,
+  Present,
 };
 
 /**

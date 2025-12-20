@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <cstdint>
 #include <span>
 
@@ -11,6 +12,26 @@
 #include "rhi/texture.hpp"
 
 namespace rhi {
+/**
+ * @brief Describes a color attachment for rendering
+ */
+struct RenderingAttachment {
+  Texture* texture{nullptr};
+  ImageLayout layout{ImageLayout::ColorAttachment};
+  bool clear{false};
+  std::array<float, 4> clearColor{0.0F, 0.0F, 0.0F, 1.0F};
+};
+
+/**
+ * @brief Describes the rendering area and attachments
+ */
+struct RenderingInfo {
+  uint32_t width{0};
+  uint32_t height{0};
+  std::span<const RenderingAttachment> colorAttachments;
+  const RenderingAttachment* depthAttachment{nullptr};
+};
+
 /**
  * @brief Abstract base class for command buffers in the rendering hardware
  * interface (RHI).
@@ -30,11 +51,47 @@ class CommandBuffer {
   virtual void End() = 0;
 
   /**
+   * @brief Begins a dynamic rendering pass.
+   *
+   * @param info Rendering info describing attachments and area.
+   */
+  virtual void BeginRendering(const RenderingInfo& info) = 0;
+
+  /**
+   * @brief Ends the current dynamic rendering pass.
+   */
+  virtual void EndRendering() = 0;
+
+  /**
+   * @brief Sets the viewport dynamically.
+   *
+   * @param x X coordinate of the viewport.
+   * @param y Y coordinate of the viewport.
+   * @param width Width of the viewport.
+   * @param height Height of the viewport.
+   * @param minDepth Minimum depth of the viewport.
+   * @param maxDepth Maximum depth of the viewport.
+   */
+  virtual void SetViewport(float x, float y, float width, float height,
+                           float minDepth = 0.0F, float maxDepth = 1.0F) = 0;
+
+  /**
+   * @brief Sets the scissor rect dynamically.
+   *
+   * @param x X coordinate of the scissor rect.
+   * @param y Y coordinate of the scissor rect.
+   * @param width Width of the scissor rect.
+   * @param height Height of the scissor rect.
+   */
+  virtual void SetScissor(int32_t x, int32_t y, uint32_t width,
+                          uint32_t height) = 0;
+
+  /**
    * @brief Binds pipeline state to the command buffer.
    *
    * @param pipeline The pipeline state to bind.
    */
-  virtual void BindPipeline(const Pipeline& pipeline) = 0;
+  virtual void BindPipeline(const Pipeline* pipeline) = 0;
 
   /**
    * @brief Binds descriptor sets to the command buffer.
@@ -96,9 +153,24 @@ class CommandBuffer {
    * @brief Transitions a texture to a new layout.
    *
    * @param texture The texture to transition.
-   * TODO: Add old/new layouts as parameters.
+   * @param oldLayout The current layout of the texture.
+   * @param newLayout The target layout of the texture.
    */
-  virtual void TransitionTexture(Texture* texture /*, old/new layouts*/) = 0;
+  virtual void TransitionTexture(Texture* texture, ImageLayout oldLayout,
+                                 ImageLayout newLayout) = 0;
+
+  /**
+   * @brief Copies data from one buffer to another.
+   */
+  virtual void CopyBuffer(const Buffer* src, Buffer* dst, Size srcOffset,
+                          Size dstOffset, Size size) = 0;
+
+  /**
+   * @brief Copies data from a buffer to a texture.
+   */
+  virtual void CopyBufferToTexture(const Buffer* src, Texture* dst,
+                                   uint32_t mipLevel = 0,
+                                   uint32_t arrayLayer = 0) = 0;
 };
 
 /**
@@ -142,6 +214,16 @@ class CommandQueue {
                       std::span<Semaphore* const> waitSemaphores,
                       std::span<Semaphore* const> signalSemaphores,
                       Fence* fence = nullptr) = 0;
+
+  /**
+   * @brief Pushes constants to the pipeline.
+   *
+   * @param pipeline The pipeline to push constants to.
+   * @param offset Offset in bytes.
+   * @param data The constant data.
+   */
+  virtual void PushConstants(const Pipeline* pipeline, uint32_t offset,
+                             std::span<const std::byte> data) = 0;
 
   /**
    * @brief Presents the rendered image to the display.

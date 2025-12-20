@@ -12,11 +12,16 @@ class Device {
   virtual ~Device() = default;
 
   /**
+   * @brief Waits for the device to become idle.
+   */
+  virtual void WaitIdle() = 0;
+
+  /**
    * @brief Get the Swapchain associated with this device.
    *
    * @return Swapchain* Pointer to the Swapchain object.
    */
-  virtual Swapchain* GetSwapchain() = 0;
+  [[nodiscard]] virtual Swapchain* GetSwapchain() = 0;
 
   /**
    * @brief Gets a queue of the specified type.
@@ -24,6 +29,6 @@ class Device {
    * @param type The type of queue to retrieve.
    * @return A pointer to the queue, or nullptr if not available.
    */
-  virtual Queue* GetQueue(QueueType type) = 0;
+  [[nodiscard]] virtual Queue* GetQueue(QueueType type) = 0;
 };
 }  // namespace rhi

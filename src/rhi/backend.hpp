@@ -40,7 +40,7 @@ class BackendFactory {
    * @param enableValidation Whether to enable validation layers (if supported)
    * @return Backend The created backend with its device and factory
    */
-  static Backend Create(BackendType type, Window& window,
-                        bool enableValidation = false);
+  static Backend Create(BackendType type, Window& window, uint32_t width,
+                        uint32_t height, bool enableValidation = false);
 };
 }  // namespace rhi

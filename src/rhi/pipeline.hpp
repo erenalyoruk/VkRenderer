@@ -22,6 +22,33 @@ class PipelineLayout {
 };
 
 /**
+ * @brief Vertex input rate
+ */
+enum class VertexInputRate : uint8_t {
+  Vertex,
+  Instance,
+};
+
+/**
+ * @brief Describes a vertex binding
+ */
+struct VertexBinding {
+  uint32_t binding{0};
+  uint32_t stride{0};
+  VertexInputRate inputRate{VertexInputRate::Vertex};
+};
+
+/**
+ * @brief Describes a vertex attribute
+ */
+struct VertexAttribute {
+  uint32_t location{0};
+  uint32_t binding{0};
+  Format format{Format::R32G32B32A32Sfloat};
+  uint32_t offset{0};
+};
+
+/**
  * @brief Structure describing the configuration of a graphics pipeline.
  */
 struct GraphicsPipelineDesc {
@@ -33,6 +60,14 @@ struct GraphicsPipelineDesc {
 
   // Pipeline layout
   const PipelineLayout* layout{nullptr};
+
+  // Vertex input
+  std::span<const VertexBinding> vertexBindings;
+  std::span<const VertexAttribute> vertexAttributes;
+
+  // Color attachment formats for dynamic rendering
+  std::span<const Format> colorFormats;
+  Format depthFormat{Format::Undefined};
 };
 
 /**

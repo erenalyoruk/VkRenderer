@@ -7,9 +7,29 @@ namespace rhi {
  * @brief Pixel and buffer formats
  */
 enum class Format : uint8_t {
-  R8G8B8A8Unorm,       // 8-bit unsigned normalized RGBA
-  R32G32B32A32Sfloat,  // 32-bit signed float RGBA
-  D32Sfloat,           // 32-bit signed float depth
+  Undefined,
+  // 8-bit formats
+  R8Unorm,
+  R8G8Unorm,
+  R8G8B8Unorm,
+  R8G8B8A8Unorm,
+  R8G8B8A8Srgb,
+  B8G8R8A8Unorm,
+  B8G8R8A8Srgb,
+  // 16-bit formats
+  R16Sfloat,
+  R16G16Sfloat,
+  R16G16B16A16Sfloat,
+  // 32-bit formats
+  R32Sfloat,
+  R32G32Sfloat,
+  R32G32B32Sfloat,
+  R32G32B32A32Sfloat,
+  // Depth formats
+  D16Unorm,
+  D32Sfloat,
+  D24UnormS8Uint,
+  D32SfloatS8Uint,
 };
 
 /**
