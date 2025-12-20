@@ -12,16 +12,29 @@ void RenderSystem::Render(entt::registry& registry, float deltaTime) {
 
   auto* swapchain = device_.GetSwapchain();
 
-  // Begin frame (waits for fence, resets command pool)
-  context_.BeginFrame(frameCounter_);
+  // Skip rendering when window is minimized (0x0 dimensions)
+  if (swapchain->GetWidth() == 0 || swapchain->GetHeight() == 0) {
+    return;
+  }
 
-  auto& frame = context_.GetCurrentFrame();
-
-  // Use semaphore indexed by current frame for acquire
+  // Try to acquire image BEFORE beginning frame
+  // This way if it fails, we haven't reset the fence yet
   uint32_t semaphoreIndex = frameCounter_ % swapchain->GetImageCount();
   auto* imageAvailableSem = context_.GetImageAvailableSemaphore(semaphoreIndex);
 
   uint32_t imageIndex = swapchain->AcquireNextImage(imageAvailableSem);
+
+  // Handle swapchain out of date (resize needed)
+  if (imageIndex == UINT32_MAX) {
+    // Don't begin frame, just return - resize callback will handle recreation
+    return;
+  }
+
+  // Now we know we have a valid image, begin frame (waits for fence, resets
+  // command pool)
+  context_.BeginFrame(frameCounter_);
+
+  auto& frame = context_.GetCurrentFrame();
 
   // Use semaphore indexed by acquired image for rendering/present
   auto* renderFinishedSem = context_.GetRenderFinishedSemaphore(imageIndex);

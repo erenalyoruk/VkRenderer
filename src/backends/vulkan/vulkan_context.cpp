@@ -103,9 +103,16 @@ void VulkanQueue::Present(rhi::Swapchain* swapchain, uint32_t imageIndex,
       .pImageIndices = &imageIndex,
   };
 
-  auto result{queue_.presentKHR(presentInfo)};
-  if (result != vk::Result::eSuccess) {
-    LOG_ERROR("Failed to present swapchain image: {}", vk::to_string(result));
+  // Use try-catch because vulkan-hpp throws on OUT_OF_DATE
+  try {
+    auto result = queue_.presentKHR(presentInfo);
+    // eSuboptimalKHR is not an error, just a hint
+    if (result == vk::Result::eSuboptimalKHR) {
+      LOG_DEBUG("Swapchain suboptimal, resize recommended");
+    }
+  } catch (const vk::OutOfDateKHRError&) {
+    // Swapchain out of date, will be recreated on next frame
+    LOG_DEBUG("Swapchain out of date during present");
   }
 }
 

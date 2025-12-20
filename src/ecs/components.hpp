@@ -53,6 +53,7 @@ struct HierarchyComponent {
 struct Vertex {
   glm::vec3 position{0.0F};
   glm::vec3 normal{0.0F};
+  glm::vec4 tangent{0.0F, 0.0F, 0.0F, 1.0F};
   glm::vec2 texCoord{0.0F};
   glm::vec4 color{1.0F};
 
@@ -76,9 +77,13 @@ struct Vertex {
          .offset = offsetof(Vertex, normal)},
         {.location = 2,
          .binding = 0,
+         .format = rhi::Format::R32G32B32A32Sfloat,
+         .offset = offsetof(Vertex, tangent)},
+        {.location = 3,
+         .binding = 0,
          .format = rhi::Format::R32G32Sfloat,
          .offset = offsetof(Vertex, texCoord)},
-        {.location = 3,
+        {.location = 4,
          .binding = 0,
          .format = rhi::Format::R32G32B32A32Sfloat,
          .offset = offsetof(Vertex, color)},

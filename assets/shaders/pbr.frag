@@ -4,6 +4,7 @@ layout(location = 0) in vec3 inWorldPos;
 layout(location = 1) in vec3 inNormal;
 layout(location = 2) in vec2 inTexCoord;
 layout(location = 3) in vec4 inColor;
+layout(location = 4) in mat3 inTBN;
 
 layout(location = 0) out vec4 outColor;
 
@@ -86,7 +87,11 @@ void main() {
   float roughness = metallicRoughness.y * material.roughnessFactor;
   roughness = max(roughness, 0.04);  // Prevent divide by zero
 
-  vec3 N = normalize(inNormal);
+  // Sample and transform normal from tangent space to world space
+  vec3 normalSample = texture(normalTex, inTexCoord).rgb;
+  normalSample = normalSample * 2.0 - 1.0;  // Unpack from [0,1] to [-1,1]
+  vec3 N = normalize(inTBN * normalSample);
+
   vec3 V = normalize(global.cameraPosition.xyz - inWorldPos);
   vec3 L = normalize(-global.lightDirection.xyz);
   vec3 H = normalize(V + L);

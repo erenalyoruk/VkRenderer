@@ -130,20 +130,31 @@ VulkanSwapchain::VulkanSwapchain(
 }
 
 uint32_t VulkanSwapchain::AcquireNextImage(rhi::Semaphore* signalSemaphore) {
-  vk::AcquireNextImageInfoKHR acquireInfo{
-      .swapchain = swapchain_.get(),
-      .timeout = UINT64_MAX,
-      .semaphore =
-          (signalSemaphore != nullptr)
-              ? std::bit_cast<VulkanSemaphore*>(signalSemaphore)->GetSemaphore()
-              : VK_NULL_HANDLE,
-      .deviceMask = 1,
-  };
+  try {
+    vk::AcquireNextImageInfoKHR acquireInfo{
+        .swapchain = swapchain_.get(),
+        .timeout = UINT64_MAX,
+        .semaphore = (signalSemaphore != nullptr)
+                         ? std::bit_cast<VulkanSemaphore*>(signalSemaphore)
+                               ->GetSemaphore()
+                         : VK_NULL_HANDLE,
+        .deviceMask = 1,
+    };
 
-  uint32_t imageIndex{0};
-  [[maybe_unused]] vk::Result result =
-      context_.GetDevice().acquireNextImage2KHR(&acquireInfo, &imageIndex);
-  return imageIndex;
+    uint32_t imageIndex{0};
+    vk::Result result =
+        context_.GetDevice().acquireNextImage2KHR(&acquireInfo, &imageIndex);
+
+    // Return UINT32_MAX to signal that the swapchain needs recreation
+    if (result == vk::Result::eErrorOutOfDateKHR ||
+        result == vk::Result::eSuboptimalKHR) {
+      return UINT32_MAX;
+    }
+
+    return imageIndex;
+  } catch (const vk::OutOfDateKHRError&) {
+    return UINT32_MAX;
+  }
 }
 
 void VulkanSwapchain::Present(uint32_t /*imageIndex*/,

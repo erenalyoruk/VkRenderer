@@ -29,6 +29,17 @@ void EventManager::PollEvents() {
         window_.NotifyResize(event.window.data1, event.window.data2);
         break;
 
+      case SDL_EVENT_WINDOW_RESTORED: {
+        // Window restored from minimized
+        int w = 0;
+        int h = 0;
+        SDL_GetWindowSize(window_.GetHandle(), &w, &h);
+        if (w > 0 && h > 0) {
+          window_.NotifyResize(w, h);
+        }
+        break;
+      }
+
       default:
         break;
     }
@@ -38,5 +49,4 @@ void EventManager::PollEvents() {
 void EventManager::AddQuitCallback(QuitCallback callback) {
   quitCallbacks_.push_back(std::move(callback));
 }
-
 }  // namespace event

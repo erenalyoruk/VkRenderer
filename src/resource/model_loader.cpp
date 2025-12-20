@@ -171,6 +171,88 @@ struct ModelLoader::Impl {
     }
   }
 
+  // Compute tangents using MikkTSpace-style algorithm (simplified)
+  static void ComputeTangents(std::vector<ecs::Vertex>& vertices,
+                              const std::vector<uint32_t>& indices,
+                              uint32_t indexOffset, uint32_t indexCount,
+                              uint32_t vertexOffset) {
+    // Zero out tangents for accumulation
+    for (uint32_t i = vertexOffset; i < vertexOffset + indexCount; ++i) {
+      if (i < vertices.size()) {
+        vertices[i].tangent = glm::vec4(0.0F);
+      }
+    }
+
+    // Process each triangle
+    for (uint32_t i = indexOffset; i < indexOffset + indexCount; i += 3) {
+      if (i + 2 >= indices.size()) {
+        break;
+      }
+
+      uint32_t i0 = indices[i] + vertexOffset;
+      uint32_t i1 = indices[i + 1] + vertexOffset;
+      uint32_t i2 = indices[i + 2] + vertexOffset;
+
+      if (i0 >= vertices.size() || i1 >= vertices.size() ||
+          i2 >= vertices.size()) {
+        continue;
+      }
+
+      const glm::vec3& p0 = vertices[i0].position;
+      const glm::vec3& p1 = vertices[i1].position;
+      const glm::vec3& p2 = vertices[i2].position;
+
+      const glm::vec2& uv0 = vertices[i0].texCoord;
+      const glm::vec2& uv1 = vertices[i1].texCoord;
+      const glm::vec2& uv2 = vertices[i2].texCoord;
+
+      glm::vec3 edge1 = p1 - p0;
+      glm::vec3 edge2 = p2 - p0;
+
+      glm::vec2 deltaUV1 = uv1 - uv0;
+      glm::vec2 deltaUV2 = uv2 - uv0;
+
+      float denom = (deltaUV1.x * deltaUV2.y) - (deltaUV2.x * deltaUV1.y);
+      if (std::abs(denom) < 1e-6F) {
+        continue;  // Degenerate UV mapping
+      }
+
+      float f = 1.0F / denom;
+
+      glm::vec3 tangent;
+      tangent.x = f * (deltaUV2.y * edge1.x - deltaUV1.y * edge2.x);
+      tangent.y = f * (deltaUV2.y * edge1.y - deltaUV1.y * edge2.y);
+      tangent.z = f * (deltaUV2.y * edge1.z - deltaUV1.y * edge2.z);
+
+      // Accumulate tangents (will normalize later)
+      vertices[i0].tangent += glm::vec4(tangent, 0.0F);
+      vertices[i1].tangent += glm::vec4(tangent, 0.0F);
+      vertices[i2].tangent += glm::vec4(tangent, 0.0F);
+    }
+
+    // Normalize tangents and compute handedness
+    for (uint32_t i = vertexOffset;
+         i < vertexOffset + indexCount && i < vertices.size(); ++i) {
+      glm::vec3 n = vertices[i].normal;
+      auto t = glm::vec3(vertices[i].tangent);
+
+      if (glm::length(t) > 1e-6F) {
+        // Gram-Schmidt orthogonalize
+        t = glm::normalize(t - n * glm::dot(n, t));
+
+        // Calculate handedness (bitangent direction)
+        // For glTF, tangent.w should already be set, but we default to 1.0
+        vertices[i].tangent = glm::vec4(t, 1.0F);
+      } else {
+        // Create arbitrary tangent perpendicular to normal
+        glm::vec3 up =
+            std::abs(n.y) < 0.999F ? glm::vec3(0, 1, 0) : glm::vec3(1, 0, 0);
+        t = glm::normalize(glm::cross(n, up));
+        vertices[i].tangent = glm::vec4(t, 1.0F);
+      }
+    }
+  }
+
   // NOLINTNEXTLINE(readability-function-cognitive-complexity)
   void LoadMeshes(const tinygltf::Model& gltf, Model& model) {
     for (const auto& gltfMesh : gltf.meshes) {
@@ -287,6 +369,20 @@ struct ModelLoader::Impl {
                             : componentSize * numComponents;
         }
 
+        // Tangent
+        const uint8_t* tangentData = nullptr;
+        size_t tangentStride = 0;
+        if (auto it = primitive.attributes.find("TANGENT");
+            it != primitive.attributes.end()) {
+          const auto& accessor = gltf.accessors[it->second];
+          const auto& bufferView = gltf.bufferViews[accessor.bufferView];
+          const auto& buffer = gltf.buffers[bufferView.buffer];
+          tangentData =
+              buffer.data.data() + bufferView.byteOffset + accessor.byteOffset;
+          tangentStride = (bufferView.byteStride != 0U) ? bufferView.byteStride
+                                                        : sizeof(float) * 4;
+        }
+
         // Build vertices
         for (size_t i = 0; i < vertexCount; ++i) {
           ecs::Vertex v{};
@@ -302,7 +398,17 @@ struct ModelLoader::Impl {
                 std::bit_cast<const float*>(normData + (i * normStride));
             v.normal = glm::vec3(norm[0], norm[1], norm[2]);
           } else {
-            v.normal = glm::vec3(0.0F, 1.0F, 0.0F);  // Default up normal
+            v.normal = glm::vec3(0.0F, 1.0F, 0.0F);
+          }
+
+          // Tangent
+          if (tangentData != nullptr) {
+            const auto* tan =
+                std::bit_cast<const float*>(tangentData + (i * tangentStride));
+            v.tangent = glm::vec4(tan[0], tan[1], tan[2], tan[3]);
+          } else {
+            // Default tangent (will be computed later if needed)
+            v.tangent = glm::vec4(1.0F, 0.0F, 0.0F, 1.0F);
           }
 
           // Texcoord
@@ -387,6 +493,13 @@ struct ModelLoader::Impl {
 
             indices.push_back(index);
           }
+        }
+
+        // Compute tangents if not provided in the glTF
+        if (tangentData == nullptr && !indices.empty()) {
+          ComputeTangents(vertices, indices, prim.indexOffset, prim.indexCount,
+                          prim.vertexOffset);
+          LOG_DEBUG("Computed tangents for primitive in mesh: {}", mesh.name);
         }
 
         mesh.primitives.push_back(prim);
