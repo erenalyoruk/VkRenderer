@@ -155,7 +155,7 @@ rhi::Pipeline* PipelineManager::GetPipeline(PipelineType type) {
 
 void PipelineManager::RecreatePipelines() {
   pipelines_.clear();
-  Initialize(globalLayout_, materialLayout_, objectLayout_);
+  Initialize(globalLayout_, materialLayout_, iblLayout_, objectLayout_);
 }
 
 }  // namespace renderer
