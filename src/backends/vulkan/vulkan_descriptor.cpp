@@ -125,11 +125,16 @@ void VulkanDescriptorSet::BindTexture(uint32_t binding,
       .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal,
   };
 
+  // Use CombinedImageSampler when sampler is provided, otherwise SampledImage
+  vk::DescriptorType descriptorType =
+      (vkSampler != nullptr) ? vk::DescriptorType::eCombinedImageSampler
+                             : vk::DescriptorType::eSampledImage;
+
   vk::WriteDescriptorSet write{
       .dstSet = set_,
       .dstBinding = binding,
       .descriptorCount = 1,
-      .descriptorType = vk::DescriptorType::eSampledImage,
+      .descriptorType = descriptorType,
       .pImageInfo = &imageInfo,
   };
 

@@ -10,8 +10,14 @@
 namespace renderer {
 
 RenderContext::RenderContext(rhi::Device& device, rhi::Factory& factory)
-    : device_{device}, factory_{factory}, pipelineManager_{factory, device} {
+    : device_{device},
+      factory_{factory},
+      pipelineManager_{factory, device},
+      materialManager_{factory} {
   CreateDescriptors();
+
+  materialManager_.SetSampler(*defaultSampler_);
+  materialManager_.Initialize(materialDescriptorLayout_.get());
 
   // Initialize pipeline manager with our descriptor layouts
   pipelineManager_.Initialize(globalDescriptorLayout_.get(),

@@ -140,7 +140,7 @@ void RenderSystem::ExecuteRendering(entt::registry& registry,
   // Different clear colors for different modes
   glm::vec4 clearColor{0.1F, 0.1F, 0.15F, 1.0F};
   if (activePipeline_ == PipelineType::Wireframe) {
-    clearColor = glm::vec4{0.02F, 0.02F, 0.05F, 1.0F};  // Darker for wireframe
+    clearColor = glm::vec4{0.02F, 0.02F, 0.05F, 1.0F};
   }
 
   rhi::RenderingAttachment colorAttachment{
@@ -183,12 +183,16 @@ void RenderSystem::ExecuteRendering(entt::registry& registry,
     pipeline = context_.GetPipeline(PipelineType::Unlit);
   }
 
+  // Get default material for fallback
+  auto* defaultMaterial = context_.GetMaterialManager().GetDefaultMaterial();
+
   if (pipeline != nullptr) {
     cmd->BindPipeline(pipeline);
 
-    std::array<const rhi::DescriptorSet*, 1> descriptorSets = {
+    // Bind global descriptor set (set 0)
+    std::array<const rhi::DescriptorSet*, 1> globalSets = {
         frame.globalDescriptorSet.get()};
-    cmd->BindDescriptorSets(pipeline, 0, descriptorSets);
+    cmd->BindDescriptorSets(pipeline, 0, globalSets);
 
     auto view = registry.view<ecs::MeshComponent, ecs::WorldTransformComponent,
                               ecs::RenderableComponent>();
@@ -199,6 +203,12 @@ void RenderSystem::ExecuteRendering(entt::registry& registry,
 
       if (!mesh.vertexBuffer || !mesh.indexBuffer) {
         continue;
+      }
+
+      // Get material component if exists
+      ecs::MaterialComponent* matComp = nullptr;
+      if (registry.all_of<ecs::MaterialComponent>(entity)) {
+        matComp = &registry.get<ecs::MaterialComponent>(entity);
       }
 
       ObjectUniforms objUniforms{};
@@ -218,7 +228,25 @@ void RenderSystem::ExecuteRendering(entt::registry& registry,
       cmd->BindIndexBuffer(*mesh.indexBuffer, 0, true);
 
       for (const auto& submesh : mesh.subMeshes) {
-        cmd->DrawIndexed(submesh.indexCount, 1, submesh.indexOffset, 0, 0);
+        // Bind material descriptor set (set 1) per submesh
+        GPUMaterial* gpuMat = defaultMaterial;
+
+        if (matComp != nullptr && !matComp->gpuMaterials.empty()) {
+          uint32_t matIdx = submesh.materialIndex;
+          if (matIdx < matComp->gpuMaterials.size() &&
+              matComp->gpuMaterials[matIdx] != nullptr) {
+            gpuMat = matComp->gpuMaterials[matIdx];
+          }
+        }
+
+        if (gpuMat != nullptr && gpuMat->descriptorSet) {
+          std::array<const rhi::DescriptorSet*, 1> materialSets = {
+              gpuMat->descriptorSet.get()};
+          cmd->BindDescriptorSets(pipeline, 1, materialSets);
+        }
+
+        cmd->DrawIndexed(submesh.indexCount, 1, submesh.indexOffset,
+                         static_cast<int32_t>(submesh.vertexOffset), 0);
         stats_.drawCalls++;
         stats_.triangles += submesh.indexCount / 3;
       }

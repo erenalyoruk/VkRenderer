@@ -10,6 +10,10 @@
 #include "rhi/pipeline.hpp"
 #include "rhi/texture.hpp"
 
+namespace renderer {
+class GPUMaterial;
+}
+
 namespace ecs {
 // ============================================================================
 // Transform Components
@@ -115,6 +119,9 @@ struct PBRMaterial {
 struct MaterialComponent {
   std::shared_ptr<PBRMaterial> material;
   std::shared_ptr<rhi::DescriptorSet> descriptorSet;
+
+  // GPU materials for each submesh (indexed by materialIndex in SubMesh)
+  std::vector<renderer::GPUMaterial*> gpuMaterials;
 };
 
 // ============================================================================

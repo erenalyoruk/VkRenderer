@@ -3,8 +3,7 @@
 #include <entt/entt.hpp>
 
 #include "ecs/components.hpp"
-#include "pipeline_manager.hpp"
-#include "render_context.hpp"
+#include "renderer/render_context.hpp"
 #include "rhi/device.hpp"
 
 namespace renderer {

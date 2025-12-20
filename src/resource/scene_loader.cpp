@@ -4,7 +4,22 @@ namespace resource {
 
 entt::entity SceneLoader::Instantiate(
     entt::registry& registry, const Model& model,
+    renderer::MaterialManager& materialManager,
     const ecs::TransformComponent& rootTransform) {
+  // Create GPU materials for all model materials
+  std::vector<renderer::GPUMaterial*> gpuMaterials;
+  gpuMaterials.reserve(model.materials.size());
+
+  for (const auto& material : model.materials) {
+    auto* gpuMat = materialManager.CreateMaterial(material, model.textures);
+    gpuMaterials.push_back(gpuMat);
+  }
+
+  // If no materials, add default
+  if (gpuMaterials.empty()) {
+    gpuMaterials.push_back(materialManager.GetDefaultMaterial());
+  }
+
   // Create root entity
   auto root = registry.create();
   registry.emplace<ecs::TransformComponent>(root, rootTransform);
@@ -12,17 +27,17 @@ entt::entity SceneLoader::Instantiate(
 
   // Instantiate all root nodes as children of root
   for (uint32_t nodeIndex : model.rootNodes) {
-    InstantiateNode(registry, model, nodeIndex, root);
+    InstantiateNode(registry, model, gpuMaterials, nodeIndex, root);
   }
 
   return root;
 }
 
 // NOLINTNEXTLINE(readability-function-cognitive-complexity, misc-no-recursion)
-entt::entity SceneLoader::InstantiateNode(entt::registry& registry,
-                                          const Model& model,
-                                          uint32_t nodeIndex,
-                                          entt::entity parent) {
+entt::entity SceneLoader::InstantiateNode(
+    entt::registry& registry, const Model& model,
+    const std::vector<renderer::GPUMaterial*>& gpuMaterials, uint32_t nodeIndex,
+    entt::entity parent) {
   const auto& node = model.nodes[nodeIndex];
 
   auto entity = registry.create();
@@ -65,6 +80,11 @@ entt::entity SceneLoader::InstantiateNode(entt::registry& registry,
     registry.emplace<ecs::MeshComponent>(entity, std::move(meshComp));
     registry.emplace<ecs::BoundingBoxComponent>(entity, mesh.bounds);
     registry.emplace<ecs::RenderableComponent>(entity);
+
+    // Add MaterialComponent with GPU materials
+    ecs::MaterialComponent matComp;
+    matComp.gpuMaterials = gpuMaterials;
+    registry.emplace<ecs::MaterialComponent>(entity, std::move(matComp));
   }
 
   // Light
@@ -75,8 +95,7 @@ entt::entity SceneLoader::InstantiateNode(entt::registry& registry,
     switch (light.type) {
       case Light::Type::Directional: {
         ecs::DirectionalLightComponent dirLight;
-        dirLight.direction =
-            glm::vec3(0.0F, 0.0F, -1.0F);  // Will be transformed
+        dirLight.direction = glm::vec3(0.0F, 0.0F, -1.0F);
         dirLight.color = light.color;
         dirLight.intensity = light.intensity;
         registry.emplace<ecs::DirectionalLightComponent>(entity, dirLight);
@@ -107,16 +126,13 @@ entt::entity SceneLoader::InstantiateNode(entt::registry& registry,
   // Camera
   if (node.cameraIndex >= 0 &&
       node.cameraIndex < static_cast<int32_t>(model.cameras.size())) {
-    const auto& cam = model.cameras[node.cameraIndex];
-
     ecs::CameraComponent camComp;
-    // Camera matrices will be computed by camera system
     registry.emplace<ecs::CameraComponent>(entity, camComp);
   }
 
   // Recurse children
   for (uint32_t childIndex : node.children) {
-    InstantiateNode(registry, model, childIndex, entity);
+    InstantiateNode(registry, model, gpuMaterials, childIndex, entity);
   }
 
   return entity;

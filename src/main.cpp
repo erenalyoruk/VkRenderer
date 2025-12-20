@@ -36,6 +36,12 @@ int main() {
   // Create resource manager and load Sponza
   resource::ResourceManager resources{*factory};
 
+  // Create render system
+  renderer::RenderSystem renderSystem{*device, *factory};
+
+  // Current pipeline mode
+  renderer::PipelineType currentPipeline = renderer::PipelineType::PBRLit;
+
   resource::Model* sponzaModel =
       resources.LoadModel("assets/models/Sponza/Sponza.gltf");
   if (sponzaModel == nullptr) {
@@ -47,7 +53,9 @@ int main() {
 
   ecs::TransformComponent sponzaTransform{};
   sponzaTransform.scale = glm::vec3(1.0F);
-  resource::SceneLoader::Instantiate(registry, *sponzaModel, sponzaTransform);
+  auto rootEntity = resource::SceneLoader::Instantiate(
+      registry, *sponzaModel, renderSystem.GetContext().GetMaterialManager(),
+      sponzaTransform);
 
   size_t totalPrimitives = 0;
   for (const auto& mesh : sponzaModel->meshes) {
@@ -83,12 +91,6 @@ int main() {
   camera::Camera camera{cameraSettings, app.GetWindow().GetAspectRatio()};
   camera.SetPosition(glm::vec3(0.0F, 2.0F, 5.0F));
   camera::FPSCameraController cameraController{camera};
-
-  // Create render system
-  renderer::RenderSystem renderSystem{*device, *factory};
-
-  // Current pipeline mode
-  renderer::PipelineType currentPipeline = renderer::PipelineType::PBRLit;
 
   // Handle window resize
   app.GetWindow().AddResizeCallback(

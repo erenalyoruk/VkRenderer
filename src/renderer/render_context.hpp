@@ -5,6 +5,7 @@
 
 #include <glm/glm.hpp>
 
+#include "renderer/material_manager.hpp"
 #include "renderer/pipeline_manager.hpp"
 #include "rhi/buffer.hpp"
 #include "rhi/command.hpp"
@@ -104,6 +105,10 @@ class RenderContext {
     return materialDescriptorLayout_.get();
   }
 
+  [[nodiscard]] MaterialManager& GetMaterialManager() {
+    return materialManager_;
+  }
+
   void UpdateGlobalUniforms(const GlobalUniforms& uniforms);
   void OnSwapchainResized();
 
@@ -119,16 +124,19 @@ class RenderContext {
   std::array<FrameData, kMaxFramesInFlight> frames_;
   uint32_t currentFrame_{0};
 
-  // Semaphores per swapchain image (not per frame!)
+  // Semaphores per swapchain image
   std::vector<std::unique_ptr<rhi::Semaphore>> imageAvailableSemaphores_;
   std::vector<std::unique_ptr<rhi::Semaphore>> renderFinishedSemaphores_;
 
-  // Descriptor layouts (created before pipeline manager)
+  // Descriptor layouts
   std::unique_ptr<rhi::DescriptorSetLayout> globalDescriptorLayout_;
   std::unique_ptr<rhi::DescriptorSetLayout> materialDescriptorLayout_;
 
   // Pipeline management
   PipelineManager pipelineManager_;
+
+  // Material management
+  MaterialManager materialManager_;
 
   // Shared resources
   std::unique_ptr<rhi::Sampler> defaultSampler_;

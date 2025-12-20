@@ -143,15 +143,17 @@ VulkanContext::VulkanContext(class Window& window, uint32_t width,
     swapchain_ = VulkanSwapchain::Create(*this, width, height,
                                          rhi::Format::R8G8B8A8Unorm);
 
-    std::array<vk::DescriptorPoolSize, 4> poolSizes{{
-        {.type = vk::DescriptorType::eUniformBuffer, .descriptorCount = 100},
+    std::array<vk::DescriptorPoolSize, 5> poolSizes{{
+        {.type = vk::DescriptorType::eUniformBuffer, .descriptorCount = 1000},
         {.type = vk::DescriptorType::eStorageBuffer, .descriptorCount = 100},
-        {.type = vk::DescriptorType::eSampledImage, .descriptorCount = 100},
+        {.type = vk::DescriptorType::eSampledImage, .descriptorCount = 1000},
         {.type = vk::DescriptorType::eSampler, .descriptorCount = 100},
+        {.type = vk::DescriptorType::eCombinedImageSampler,
+         .descriptorCount = 1000},
     }};
 
     vk::DescriptorPoolCreateInfo poolInfo{
-        .maxSets = 100,
+        .maxSets = 1000,
         .poolSizeCount = static_cast<uint32_t>(poolSizes.size()),
         .pPoolSizes = poolSizes.data(),
     };
