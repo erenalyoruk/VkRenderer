@@ -77,7 +77,13 @@ void RenderContext::CreateDescriptors() {
   globalDescriptorLayout_ = factory_.CreateDescriptorSetLayout(globalBindings);
 
   // Material descriptor layout (set 1)
-  std::array<rhi::DescriptorBinding, 4> materialBindings = {{
+  // binding 0: MaterialUniforms
+  // binding 1: baseColorTex
+  // binding 2: normalTex
+  // binding 3: metallicRoughnessTex
+  // binding 4: occlusionTex
+  // binding 5: emissiveTex
+  std::array<rhi::DescriptorBinding, 6> materialBindings = {{
       {.binding = 0, .type = rhi::DescriptorType::UniformBuffer, .count = 1},
       {.binding = 1,
        .type = rhi::DescriptorType::CombinedImageSampler,
@@ -86,6 +92,12 @@ void RenderContext::CreateDescriptors() {
        .type = rhi::DescriptorType::CombinedImageSampler,
        .count = 1},
       {.binding = 3,
+       .type = rhi::DescriptorType::CombinedImageSampler,
+       .count = 1},
+      {.binding = 4,
+       .type = rhi::DescriptorType::CombinedImageSampler,
+       .count = 1},
+      {.binding = 5,
        .type = rhi::DescriptorType::CombinedImageSampler,
        .count = 1},
   }};

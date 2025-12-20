@@ -20,9 +20,11 @@ global;
 
 layout(set = 1, binding = 0) uniform MaterialUniforms {
   vec4 baseColorFactor;
+  vec3 emissiveFactor;
   float metallicFactor;
   float roughnessFactor;
   float alphaCutoff;
+  float occlusionStrength;
   float _padding;
 }
 material;
@@ -30,6 +32,8 @@ material;
 layout(set = 1, binding = 1) uniform sampler2D baseColorTex;
 layout(set = 1, binding = 2) uniform sampler2D normalTex;
 layout(set = 1, binding = 3) uniform sampler2D metallicRoughnessTex;
+layout(set = 1, binding = 4) uniform sampler2D occlusionTex;
+layout(set = 1, binding = 5) uniform sampler2D emissiveTex;
 
 const float PI = 3.14159265359;
 
@@ -87,6 +91,14 @@ void main() {
   float roughness = metallicRoughness.y * material.roughnessFactor;
   roughness = max(roughness, 0.04);  // Prevent divide by zero
 
+  // Sample occlusion (stored in R channel typically)
+  float ao = texture(occlusionTex, inTexCoord).r;
+  ao = mix(1.0, ao, material.occlusionStrength);
+
+  // Sample emissive
+  vec3 emissive =
+      texture(emissiveTex, inTexCoord).rgb * material.emissiveFactor;
+
   // Sample and transform normal from tangent space to world space
   vec3 normalSample = texture(normalTex, inTexCoord).rgb;
   normalSample = normalSample * 2.0 - 1.0;  // Unpack from [0,1] to [-1,1]
@@ -122,10 +134,11 @@ void main() {
   vec3 radiance = global.lightColor.rgb * global.lightIntensity;
   vec3 Lo = (diffuse + specular) * radiance * NdotL;
 
-  // Ambient (simple constant for now, could be IBL later)
-  vec3 ambient = vec3(0.03) * baseColor.rgb;
+  // Ambient with occlusion
+  vec3 ambient = vec3(0.03) * baseColor.rgb * ao;
 
-  vec3 color = ambient + Lo;
+  // Combine lighting + emissive
+  vec3 color = ambient + Lo + emissive;
 
   // HDR tonemapping (Reinhard)
   color = color / (color + vec3(1.0));

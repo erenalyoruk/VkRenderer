@@ -19,6 +19,7 @@ void MaterialManager::Initialize(rhi::DescriptorSetLayout* materialLayout) {
   defaultMat.metallicFactor = 0.0F;
   defaultMat.roughnessFactor = 0.5F;
   defaultMat.alphaCutoff = 0.5F;
+  defaultMat.emissiveFactor = glm::vec3(0.0F);
 
   defaultMaterial_ = std::make_unique<GPUMaterial>();
 
@@ -29,9 +30,11 @@ void MaterialManager::Initialize(rhi::DescriptorSetLayout* materialLayout) {
 
   GPUMaterialUniforms uniforms{
       .baseColorFactor = defaultMat.baseColorFactor,
+      .emissiveFactor = defaultMat.emissiveFactor,
       .metallicFactor = defaultMat.metallicFactor,
       .roughnessFactor = defaultMat.roughnessFactor,
       .alphaCutoff = defaultMat.alphaCutoff,
+      .occlusionStrength = 1.0F,
   };
 
   void* data = defaultMaterial_->uniformBuffer->Map();
@@ -49,10 +52,18 @@ void MaterialManager::Initialize(rhi::DescriptorSetLayout* materialLayout) {
                                                defaultSampler_);
   defaultMaterial_->descriptorSet->BindTexture(3, whiteTexture_.get(),
                                                defaultSampler_);
+  defaultMaterial_->descriptorSet->BindTexture(
+      4, whiteTexture_.get(),
+      defaultSampler_);  // occlusion (white = no occlusion)
+  defaultMaterial_->descriptorSet->BindTexture(
+      5, blackTexture_.get(),
+      defaultSampler_);  // emissive (black = no emission)
 
   defaultMaterial_->baseColorTexture = whiteTexture_;
   defaultMaterial_->normalTexture = normalTexture_;
   defaultMaterial_->metallicRoughnessTexture = whiteTexture_;
+  defaultMaterial_->occlusionTexture = whiteTexture_;
+  defaultMaterial_->emissiveTexture = blackTexture_;
 
   LOG_INFO("MaterialManager initialized with default material");
 }
@@ -99,9 +110,11 @@ GPUMaterial* MaterialManager::CreateMaterial(
 
   GPUMaterialUniforms uniforms{
       .baseColorFactor = material.baseColorFactor,
+      .emissiveFactor = material.emissiveFactor,
       .metallicFactor = material.metallicFactor,
       .roughnessFactor = material.roughnessFactor,
       .alphaCutoff = material.alphaCutoff,
+      .occlusionStrength = 1.0F,  // Could be loaded from glTF if available
   };
 
   void* data = gpuMat->uniformBuffer->Map();
@@ -109,6 +122,7 @@ GPUMaterial* MaterialManager::CreateMaterial(
   gpuMat->uniformBuffer->Unmap();
 
   // Resolve textures (use defaults if not specified)
+  // Base color
   if (material.baseColorTexture >= 0 &&
       material.baseColorTexture < static_cast<int32_t>(textures.size()) &&
       textures[material.baseColorTexture].texture) {
@@ -117,6 +131,7 @@ GPUMaterial* MaterialManager::CreateMaterial(
     gpuMat->baseColorTexture = whiteTexture_;
   }
 
+  // Normal
   if (material.normalTexture >= 0 &&
       material.normalTexture < static_cast<int32_t>(textures.size()) &&
       textures[material.normalTexture].texture) {
@@ -125,6 +140,7 @@ GPUMaterial* MaterialManager::CreateMaterial(
     gpuMat->normalTexture = normalTexture_;
   }
 
+  // Metallic/Roughness
   if (material.metallicRoughnessTexture >= 0 &&
       material.metallicRoughnessTexture <
           static_cast<int32_t>(textures.size()) &&
@@ -133,6 +149,24 @@ GPUMaterial* MaterialManager::CreateMaterial(
         textures[material.metallicRoughnessTexture].texture;
   } else {
     gpuMat->metallicRoughnessTexture = whiteTexture_;
+  }
+
+  // Occlusion
+  if (material.occlusionTexture >= 0 &&
+      material.occlusionTexture < static_cast<int32_t>(textures.size()) &&
+      textures[material.occlusionTexture].texture) {
+    gpuMat->occlusionTexture = textures[material.occlusionTexture].texture;
+  } else {
+    gpuMat->occlusionTexture = whiteTexture_;
+  }
+
+  // Emissive
+  if (material.emissiveTexture >= 0 &&
+      material.emissiveTexture < static_cast<int32_t>(textures.size()) &&
+      textures[material.emissiveTexture].texture) {
+    gpuMat->emissiveTexture = textures[material.emissiveTexture].texture;
+  } else {
+    gpuMat->emissiveTexture = blackTexture_;
   }
 
   // Create descriptor set
@@ -144,6 +178,10 @@ GPUMaterial* MaterialManager::CreateMaterial(
   gpuMat->descriptorSet->BindTexture(2, gpuMat->normalTexture.get(),
                                      defaultSampler_);
   gpuMat->descriptorSet->BindTexture(3, gpuMat->metallicRoughnessTexture.get(),
+                                     defaultSampler_);
+  gpuMat->descriptorSet->BindTexture(4, gpuMat->occlusionTexture.get(),
+                                     defaultSampler_);
+  gpuMat->descriptorSet->BindTexture(5, gpuMat->emissiveTexture.get(),
                                      defaultSampler_);
 
   LOG_DEBUG("Created GPU material: {}", material.name);

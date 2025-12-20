@@ -14,9 +14,11 @@ namespace renderer {
 
 struct GPUMaterialUniforms {
   alignas(16) glm::vec4 baseColorFactor;
+  alignas(16) glm::vec3 emissiveFactor;
   alignas(4) float metallicFactor;
   alignas(4) float roughnessFactor;
   alignas(4) float alphaCutoff;
+  alignas(4) float occlusionStrength;
   alignas(4) float _padding;  // NOLINT
 };
 
@@ -28,6 +30,8 @@ struct GPUMaterial {
   std::shared_ptr<rhi::Texture> baseColorTexture;
   std::shared_ptr<rhi::Texture> normalTexture;
   std::shared_ptr<rhi::Texture> metallicRoughnessTexture;
+  std::shared_ptr<rhi::Texture> occlusionTexture;
+  std::shared_ptr<rhi::Texture> emissiveTexture;
 };
 
 class MaterialManager {
