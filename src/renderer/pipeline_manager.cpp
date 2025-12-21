@@ -102,12 +102,21 @@ void PipelineManager::CreatePipeline(PipelineType type,
                                      const PipelineConfig& config) {
   auto vertShader = rhi::CreateShaderFromFile(factory_, config.vertexShaderPath,
                                               rhi::ShaderStage::Vertex);
-  auto fragShader = rhi::CreateShaderFromFile(
-      factory_, config.fragmentShaderPath, rhi::ShaderStage::Fragment);
 
-  if (!vertShader || !fragShader) {
-    LOG_WARNING("Failed to load shaders for pipeline: {} / {}",
-                config.vertexShaderPath, config.fragmentShaderPath);
+  std::unique_ptr<rhi::Shader> fragShader = nullptr;
+  if (!config.fragmentShaderPath.empty()) {
+    fragShader = rhi::CreateShaderFromFile(factory_, config.fragmentShaderPath,
+                                           rhi::ShaderStage::Fragment);
+
+    if (!fragShader) {
+      LOG_WARNING("Failed to load fragment shader: {}",
+                  config.fragmentShaderPath);
+      return;
+    }
+  }
+
+  if (!vertShader) {
+    LOG_WARNING("Failed to load vertex shader: {}", config.vertexShaderPath);
     return;
   }
 
@@ -130,7 +139,7 @@ void PipelineManager::CreatePipeline(PipelineType type,
 
   rhi::GraphicsPipelineDesc pipelineDesc{
       .vertexShader = vertShader.get(),
-      .fragmentShader = fragShader.get(),
+      .fragmentShader = fragShader ? fragShader.get() : nullptr,
       .layout = pipelineLayout_.get(),
       .vertexBindings = bindings,
       .vertexAttributes = attributes,

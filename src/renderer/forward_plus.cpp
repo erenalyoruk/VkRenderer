@@ -1,10 +1,9 @@
 #include "renderer/forward_plus.hpp"
 
 #include <algorithm>
-#include <cstring>
-#include <fstream>
 
 #include "logger.hpp"
+#include "rhi/shader_utils.hpp"
 
 namespace renderer {
 
@@ -62,19 +61,9 @@ void ForwardPlus::CreateBuffers() {
 }
 
 void ForwardPlus::CreatePipeline() {
-  // Load compute shader
-  std::ifstream file("assets/shaders/light_cull.comp.spv", std::ios::binary);
-  if (!file) {
-    LOG_ERROR("Failed to load light_cull.comp.spv");
-    return;
-  }
-
-  std::vector<char> buffer((std::istreambuf_iterator<char>(file)),
-                           std::istreambuf_iterator<char>());
-  std::vector<uint32_t> spirv(buffer.size() / 4);
-  std::memcpy(spirv.data(), buffer.data(), buffer.size());
-
-  lightCullShader_ = factory_.CreateShader(rhi::ShaderStage::Compute, spirv);
+  lightCullShader_ =
+      rhi::CreateShaderFromFile(factory_, "assets/shaders/light_cull.comp.spv",
+                                rhi::ShaderStage::Compute);
 
   // Culling descriptor layout
   // binding 0: LightCullUniforms (uniform)
