@@ -1,6 +1,8 @@
 #pragma once
 
 #include <memory>
+#include <optional>
+#include <span>
 
 #include "rhi/buffer.hpp"
 #include "rhi/command.hpp"
@@ -51,11 +53,15 @@ class Factory {
    * @param magFilter Magnification filter.
    * @param minFilter Minification filter.
    * @param addressMode Texture address mode.
+   * @param borderColor Border color for clamp to border mode.
+   * @param compareEnable Whether to enable comparison mode.
+   * @param compareOp Comparison operation.
    * @return std::unique_ptr<Sampler> Pointer to the created sampler
    */
-  virtual std::unique_ptr<Sampler> CreateSampler(Filter magFilter,
-                                                 Filter minFilter,
-                                                 AddressMode addressMode) = 0;
+  virtual std::unique_ptr<Sampler> CreateSampler(
+      Filter magFilter, Filter minFilter, AddressMode addressMode,
+      std::optional<std::span<const float, 4>> borderColor = std::nullopt,
+      bool compareEnable = false, CompareOp compareOp = CompareOp::Always) = 0;
 
   /**
    * @brief Creates a shader resource.

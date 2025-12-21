@@ -360,8 +360,15 @@ void VulkanContext::CreateLogicalDevice() {
       .bufferDeviceAddress = VK_TRUE,
   };
 
+  vk::PhysicalDeviceCustomBorderColorFeaturesEXT
+      deviceCustomBorderColorFeatures{
+          .pNext = &deviceFeatures12,
+          .customBorderColors = VK_TRUE,
+          .customBorderColorWithoutFormat = VK_FALSE,
+      };
+
   vk::PhysicalDeviceFeatures2 deviceFeatures2{
-      .pNext = &deviceFeatures12,
+      .pNext = &deviceCustomBorderColorFeatures,
       .features =
           vk::PhysicalDeviceFeatures{
               .fillModeNonSolid = VK_TRUE,
@@ -373,6 +380,7 @@ void VulkanContext::CreateLogicalDevice() {
       VK_KHR_DRAW_INDIRECT_COUNT_EXTENSION_NAME,
       "VK_KHR_buffer_device_address",
       "VK_KHR_dynamic_rendering",
+      "VK_EXT_custom_border_color",
   };
 
   vk::DeviceCreateInfo createInfo{

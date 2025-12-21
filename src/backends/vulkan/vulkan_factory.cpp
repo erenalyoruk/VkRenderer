@@ -25,10 +25,12 @@ std::unique_ptr<rhi::Texture> VulkanFactory::CreateTexture(
 }
 
 std::unique_ptr<rhi::Sampler> VulkanFactory::CreateSampler(
-    rhi::Filter magFilter, rhi::Filter minFilter,
-    rhi::AddressMode addressMode) {
+    rhi::Filter magFilter, rhi::Filter minFilter, rhi::AddressMode addressMode,
+    std::optional<std::span<const float, 4>> borderColor, bool compareEnable,
+    rhi::CompareOp compareOp) {
   return VulkanSampler::Create(context_, magFilter, minFilter, addressMode,
-                               addressMode);
+                               addressMode, borderColor, compareEnable,
+                               compareOp);
 }
 
 std::unique_ptr<rhi::Shader> VulkanFactory::CreateShader(

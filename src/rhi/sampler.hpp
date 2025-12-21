@@ -1,6 +1,9 @@
 #pragma once
 
 #include <cstdint>
+#include <span>
+
+#include "rhi/pipeline.hpp"
 
 namespace rhi {
 /**
@@ -15,8 +18,9 @@ enum class Filter : uint8_t {
  * @brief Texture addressing modes.
  */
 enum class AddressMode : uint8_t {
-  Repeat,       // Repeat the texture
-  ClampToEdge,  // Clamp to the edge of the texture
+  Repeat,        // Repeat the texture
+  ClampToEdge,   // Clamp to the edge of the texture
+  ClampToBorder  // Clamp to a border color
 };
 
 /**
@@ -54,6 +58,10 @@ class Sampler {
    */
   [[nodiscard]] virtual AddressMode GetAddressModeV() const = 0;
 
- private:
+  [[nodiscard]] virtual std::span<const float, 4> GetBorderColor() const = 0;
+
+  [[nodiscard]] virtual bool IsCompareEnabled() const = 0;
+
+  [[nodiscard]] virtual CompareOp GetCompareOp() const = 0;
 };
 }  // namespace rhi

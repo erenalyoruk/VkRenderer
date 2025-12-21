@@ -4,10 +4,11 @@
 #include <vector>
 
 #include "rhi/buffer.hpp"
-#include "rhi/sampler.hpp"
 #include "rhi/texture.hpp"
 
 namespace rhi {
+class Sampler;
+
 /**
  * @brief Types of descriptors that can be used in descriptor sets.
  */

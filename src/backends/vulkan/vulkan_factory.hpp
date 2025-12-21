@@ -20,7 +20,10 @@ class VulkanFactory : public rhi::Factory {
                                               rhi::TextureUsage usage) override;
   std::unique_ptr<rhi::Sampler> CreateSampler(
       rhi::Filter magFilter, rhi::Filter minFilter,
-      rhi::AddressMode addressMode) override;
+      rhi::AddressMode addressMode,
+      std::optional<std::span<const float, 4>> borderColor = std::nullopt,
+      bool compareEnable = false,
+      rhi::CompareOp compareOp = rhi::CompareOp::Always) override;
 
   std::unique_ptr<rhi::Shader> CreateShader(
       rhi::ShaderStage stage, std::span<const uint32_t> spirv) override;
