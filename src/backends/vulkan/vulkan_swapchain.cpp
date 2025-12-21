@@ -47,12 +47,12 @@ std::unique_ptr<VulkanSwapchain> VulkanSwapchain::Create(
   }
 
   vk::PresentModeKHR presentMode = vk::PresentModeKHR::eFifo;
-  for (const auto& mode : presentModes) {
-    if (mode == vk::PresentModeKHR::eMailbox) {
-      presentMode = mode;
-      break;
-    }
-  }
+  // for (const auto& mode : presentModes) {
+  //   if (mode == vk::PresentModeKHR::eMailbox) {
+  //     presentMode = mode;
+  //     break;
+  //   }
+  // }
 
   vk::Extent2D extent{
       .width = std::clamp(width, capabilities.minImageExtent.width,

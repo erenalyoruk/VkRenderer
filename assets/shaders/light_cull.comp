@@ -1,0 +1,165 @@
+#version 450
+
+layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+
+struct GPULight {
+  vec4 positionAndRadius;  // xyz = position, w = radius
+  vec4 colorAndIntensity;  // xyz = color, w = intensity
+  vec4 directionAndType;   // xyz = direction (spot), w = type (0=point, 1=spot)
+  vec4 spotParams;         // x = cos(inner), y = cos(outer)
+};
+
+layout(set = 0, binding = 0) uniform LightCullUniforms {
+  mat4 view;
+  mat4 projection;
+  mat4 invProjection;
+  uvec4 screenDimensions;  // x = width, y = height, z = tileCountX, w =
+                           // tileCountY
+  uint lightCount;
+  float nearPlane;
+  float farPlane;
+  uint _padding;
+}
+cull;
+
+layout(std430, set = 0, binding = 1) readonly buffer LightBuffer {
+  GPULight lights[];
+};
+
+layout(std430, set = 0, binding = 2) buffer LightIndexBuffer {
+  uint lightIndices[];
+};
+
+layout(std430, set = 0, binding = 3) buffer LightGridBuffer {
+  uvec2 lightGrid[];  // x = offset, y = count
+};
+
+// Shared memory for tile
+const uint MAX_LIGHTS_PER_TILE = 256;
+shared uint tileLightCount;
+shared uint tileLightIndices[MAX_LIGHTS_PER_TILE];
+shared uint tileMinDepthInt;
+shared uint tileMaxDepthInt;
+
+// Frustum planes for tile
+shared vec4 frustumPlanes[4];
+
+// Convert clip space to view space
+vec4 clipToView(vec4 clip) {
+  vec4 view = cull.invProjection * clip;
+  return view / view.w;
+}
+
+// Convert screen position to view space
+vec3 screenToView(vec2 screenPos, float depth) {
+  vec2 ndc = (screenPos / vec2(cull.screenDimensions.xy)) * 2.0 - 1.0;
+  vec4 clip = vec4(ndc, depth, 1.0);
+  return clipToView(clip).xyz;
+}
+
+// Create plane from 3 points
+vec4 createPlane(vec3 p0, vec3 p1, vec3 p2) {
+  vec3 v1 = p1 - p0;
+  vec3 v2 = p2 - p0;
+  vec3 n = normalize(cross(v1, v2));
+  return vec4(n, -dot(n, p0));
+}
+
+// Test sphere against plane
+bool sphereInsidePlane(vec3 center, float radius, vec4 plane) {
+  return dot(plane.xyz, center) + plane.w > -radius;
+}
+
+// Test light against tile frustum
+bool lightIntersectsTile(uint lightIndex, float minDepth, float maxDepth) {
+  GPULight light = lights[lightIndex];
+
+  vec3 lightPosWorld = light.positionAndRadius.xyz;
+  float radius = light.positionAndRadius.w;
+
+  // Transform light to view space
+  vec3 lightPosView = (cull.view * vec4(lightPosWorld, 1.0)).xyz;
+
+  // Check depth range (Z is negative in view space with right-hand coordinates)
+  if (lightPosView.z - radius > -minDepth ||
+      lightPosView.z + radius < -maxDepth) {
+    return false;
+  }
+
+  // Check against frustum planes
+  for (int i = 0; i < 4; ++i) {
+    if (!sphereInsidePlane(lightPosView, radius, frustumPlanes[i])) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+void main() {
+  uvec2 tileId = gl_WorkGroupID.xy;
+  uint tileIndex = tileId.y * cull.screenDimensions.z + tileId.x;
+  uint localIndex = gl_LocalInvocationIndex;
+
+  // Initialize shared memory
+  if (localIndex == 0) {
+    tileLightCount = 0;
+    tileMinDepthInt = 0xFFFFFFFF;
+    tileMaxDepthInt = 0;
+  }
+  barrier();
+
+  // Calculate tile bounds in screen space
+  uvec2 tileMin = tileId * uvec2(16, 16);
+  uvec2 tileMax = min(tileMin + uvec2(16, 16), cull.screenDimensions.xy);
+
+  // Build frustum planes for this tile (first thread only)
+  if (localIndex == 0) {
+    vec3 eyePos = vec3(0.0);  // Camera at origin in view space
+
+    // Tile corners at far plane
+    vec3 tl = screenToView(vec2(tileMin.x, tileMin.y), 1.0);
+    vec3 tr = screenToView(vec2(tileMax.x, tileMin.y), 1.0);
+    vec3 bl = screenToView(vec2(tileMin.x, tileMax.y), 1.0);
+    vec3 br = screenToView(vec2(tileMax.x, tileMax.y), 1.0);
+
+    // Create frustum planes (pointing inward)
+    frustumPlanes[0] = createPlane(eyePos, bl, tl);  // Left
+    frustumPlanes[1] = createPlane(eyePos, tr, br);  // Right
+    frustumPlanes[2] = createPlane(eyePos, tl, tr);  // Top
+    frustumPlanes[3] = createPlane(eyePos, br, bl);  // Bottom
+  }
+  barrier();
+
+  // Use conservative depth range for now (full frustum)
+  float minDepth = cull.nearPlane;
+  float maxDepth = cull.farPlane;
+
+  // Each thread tests some lights
+  for (uint i = localIndex; i < cull.lightCount; i += 256) {
+    if (lightIntersectsTile(i, minDepth, maxDepth)) {
+      uint idx = atomicAdd(tileLightCount, 1);
+      if (idx < MAX_LIGHTS_PER_TILE) {
+        tileLightIndices[idx] = i;
+      }
+    }
+  }
+  barrier();
+
+  // Write results to global memory
+  if (localIndex == 0) {
+    uint lightCount = min(tileLightCount, MAX_LIGHTS_PER_TILE);
+    uint offset = tileIndex * MAX_LIGHTS_PER_TILE;
+
+    lightGrid[tileIndex] = uvec2(offset, lightCount);
+  }
+  barrier();
+
+  // Copy light indices to global buffer
+  uint lightCount = min(tileLightCount, MAX_LIGHTS_PER_TILE);
+  uint baseOffset = tileIndex * MAX_LIGHTS_PER_TILE;
+
+  for (uint i = localIndex; i < lightCount; i += 256) {
+    lightIndices[baseOffset + i] = tileLightIndices[i];
+  }
+}

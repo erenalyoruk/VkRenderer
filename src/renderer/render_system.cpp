@@ -1,5 +1,6 @@
 #include "renderer/render_system.hpp"
 
+#include <cmath>
 #include <unordered_set>
 
 #include "logger.hpp"
@@ -12,6 +13,11 @@ RenderSystem::RenderSystem(rhi::Device& device, rhi::Factory& factory)
           "assets/textures/skybox.hdr")) {
     LOG_ERROR("Failed to load HDR environment map for skybox IBL.");
   }
+
+  // Initialize Forward+ screen size
+  auto* swapchain = device_.GetSwapchain();
+  context_.GetForwardPlus().UpdateScreenSize(swapchain->GetWidth(),
+                                             swapchain->GetHeight());
 }
 
 void RenderSystem::Render(entt::registry& registry, float deltaTime) {
@@ -79,6 +85,12 @@ void RenderSystem::Render(entt::registry& registry, float deltaTime) {
   if (hasCamera) {
     BuildObjectDataForCulling(registry);
     context_.GetGPUCulling().UpdateFrustum(viewProjection);
+
+    // Collect and update lights for Forward+
+    CollectLights(registry);
+    context_.GetForwardPlus().UpdateCamera(activeCamera_->view,
+                                           activeCamera_->projection,
+                                           cameraNear_, cameraFar_);
   }
 
   // Update material buffer if needed
@@ -138,6 +150,56 @@ void RenderSystem::UpdateTransforms(entt::registry& registry) {
   }
 }
 
+void RenderSystem::CollectLights(entt::registry& registry) {
+  lightCache_.clear();
+
+  // Collect point lights
+  auto pointLightView =
+      registry.view<ecs::PointLightComponent, ecs::WorldTransformComponent>();
+
+  for (auto entity : pointLightView) {
+    auto& light = pointLightView.get<ecs::PointLightComponent>(entity);
+    auto& world = pointLightView.get<ecs::WorldTransformComponent>(entity);
+
+    auto position = glm::vec3(world.matrix[3]);
+
+    GPULight gpuLight{};
+    gpuLight.positionAndRadius = glm::vec4(position, light.radius);
+    gpuLight.colorAndIntensity = glm::vec4(light.color, light.intensity);
+    gpuLight.directionAndType = glm::vec4(0.0F, 0.0F, 0.0F, 0.0F);  // Point = 0
+    gpuLight.spotParams = glm::vec4(0.0F);
+
+    lightCache_.push_back(gpuLight);
+  }
+
+  // Collect spot lights
+  auto spotLightView =
+      registry.view<ecs::SpotLightComponent, ecs::WorldTransformComponent>();
+
+  for (auto entity : spotLightView) {
+    auto& light = spotLightView.get<ecs::SpotLightComponent>(entity);
+    auto& world = spotLightView.get<ecs::WorldTransformComponent>(entity);
+
+    auto position = glm::vec3(world.matrix[3]);
+
+    // Transform direction by rotation
+    glm::vec3 direction =
+        glm::normalize(glm::mat3(world.matrix) * light.direction);
+
+    GPULight gpuLight{};
+    gpuLight.positionAndRadius = glm::vec4(position, light.radius);
+    gpuLight.colorAndIntensity = glm::vec4(light.color, light.intensity);
+    gpuLight.directionAndType = glm::vec4(direction, 1.0F);  // Spot = 1
+    gpuLight.spotParams = glm::vec4(std::cos(light.innerConeAngle),
+                                    std::cos(light.outerConeAngle), 0.0F, 0.0F);
+
+    lightCache_.push_back(gpuLight);
+  }
+
+  // Update Forward+ with collected lights
+  context_.GetForwardPlus().UpdateLights(lightCache_);
+}
+
 void RenderSystem::BuildObjectDataForCulling(entt::registry& registry) {
   objectDataCache_.clear();
 
@@ -191,6 +253,9 @@ void RenderSystem::ExecuteGPUDrivenRendering(entt::registry& registry,
   // Reset draw count and execute GPU culling
   context_.GetGPUCulling().ResetDrawCount(cmd);
   context_.GetGPUCulling().Execute(cmd);
+
+  // Execute Forward+ light culling
+  context_.GetForwardPlus().ExecuteLightCulling(cmd);
 
   cmd->TransitionTexture(swapchainImage, rhi::ImageLayout::Undefined,
                          rhi::ImageLayout::ColorAttachment);
@@ -257,6 +322,11 @@ void RenderSystem::ExecuteGPUDrivenRendering(entt::registry& registry,
     std::array<const rhi::DescriptorSet*, 1> iblSets = {
         context_.GetSkyboxIBL().GetIBLDescriptorSet()};
     cmd->BindDescriptorSets(pipeline, 3, iblSets);
+
+    // Set 4: Forward+ lighting
+    std::array<const rhi::DescriptorSet*, 1> lightSets = {
+        context_.GetForwardPlus().GetLightDescriptorSet()};
+    cmd->BindDescriptorSets(pipeline, 4, lightSets);
 
     // Bind mesh buffers and issue indirect draw
     auto view = registry.view<ecs::MeshComponent>();

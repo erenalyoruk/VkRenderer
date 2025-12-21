@@ -3,6 +3,7 @@
 #include <entt/entt.hpp>
 
 #include "ecs/components.hpp"
+#include "renderer/forward_plus.hpp"
 #include "renderer/gpu_culling.hpp"
 #include "renderer/render_context.hpp"
 #include "rhi/device.hpp"
@@ -27,6 +28,7 @@ class RenderSystem {
  private:
   void UpdateTransforms(entt::registry& registry);
   void BuildObjectDataForCulling(entt::registry& registry);
+  void CollectLights(entt::registry& registry);
   void ExecuteGPUDrivenRendering(entt::registry& registry, uint32_t imageIndex);
 
   rhi::Device& device_;
@@ -39,6 +41,11 @@ class RenderSystem {
   ecs::CameraComponent* activeCamera_{nullptr};
 
   std::vector<ObjectData> objectDataCache_;
+  std::vector<GPULight> lightCache_;
+
+  // Camera parameters for Forward+
+  float cameraNear_{0.1F};
+  float cameraFar_{1000.0F};
 };
 
 }  // namespace renderer

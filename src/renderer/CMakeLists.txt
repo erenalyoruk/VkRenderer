@@ -7,4 +7,5 @@ target_sources(
     "gpu_culling.cpp"
     "bindless_materials.cpp"
     "skybox_ibl.cpp"
+    "forward_plus.cpp"
 )

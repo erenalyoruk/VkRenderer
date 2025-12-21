@@ -79,6 +79,57 @@ int main() {
   };
   registry.emplace<ecs::DirectionalLightComponent>(lightEntity, light);
 
+  {
+    auto spotLightEntity = registry.create();
+    ecs::SpotLightComponent spotLight{
+        .direction = glm::normalize(glm::vec3(0.0F, -1.0F, 0.0F)),
+        .color = glm::vec3(1.0F, 0.0F, 0.0F),
+        .intensity = 40.0F,
+        .innerConeAngle = glm::radians(10.0F),
+        .outerConeAngle = glm::radians(25.0F),
+        .radius = 40.0F,
+    };
+    ecs::TransformComponent spotLightTransform{
+        .position = glm::vec3(-2.0F, 2.0F, 2.0F),
+    };
+    registry.emplace<ecs::SpotLightComponent>(spotLightEntity, spotLight);
+    registry.emplace<ecs::TransformComponent>(spotLightEntity,
+                                              spotLightTransform);
+    registry.emplace<ecs::WorldTransformComponent>(spotLightEntity);
+  }
+
+  {
+    auto pointLightEntity = registry.create();
+    ecs::PointLightComponent pointLight{
+        .color = glm::vec3(0.0F, 1.0F, 0.0F),
+        .intensity = 50.0F,
+        .radius = 10.0F,
+    };
+    ecs::TransformComponent pointLightTransform{
+        .position = glm::vec3(-2.0F, 3.0F, -2.0F),
+    };
+    registry.emplace<ecs::PointLightComponent>(pointLightEntity, pointLight);
+    registry.emplace<ecs::TransformComponent>(pointLightEntity,
+                                              pointLightTransform);
+    registry.emplace<ecs::WorldTransformComponent>(pointLightEntity);
+  }
+
+  {
+    auto pointLightEntity = registry.create();
+    ecs::PointLightComponent pointLight{
+        .color = glm::vec3(0.0F, 0.0F, 1.0F),
+        .intensity = 50.0F,
+        .radius = 10.0F,
+    };
+    ecs::TransformComponent pointLightTransform{
+        .position = glm::vec3(2.0F, 3.0F, 2.0F),
+    };
+    registry.emplace<ecs::PointLightComponent>(pointLightEntity, pointLight);
+    registry.emplace<ecs::TransformComponent>(pointLightEntity,
+                                              pointLightTransform);
+    registry.emplace<ecs::WorldTransformComponent>(pointLightEntity);
+  }
+
   // Create camera controller
   camera::CameraSettings cameraSettings{
       .fov = glm::radians(60.0F),

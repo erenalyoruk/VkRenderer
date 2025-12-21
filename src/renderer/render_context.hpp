@@ -6,6 +6,7 @@
 #include <glm/glm.hpp>
 
 #include "renderer/bindless_materials.hpp"
+#include "renderer/forward_plus.hpp"
 #include "renderer/gpu_culling.hpp"
 #include "renderer/pipeline_manager.hpp"
 #include "renderer/skybox_ibl.hpp"
@@ -91,6 +92,9 @@ class RenderContext {
 
   [[nodiscard]] SkyboxIBL& GetSkyboxIBL() { return *skyboxIBL_; }
 
+  // Forward+ Lighting
+  [[nodiscard]] ForwardPlus& GetForwardPlus() { return *forwardPlus_; }
+
   void UpdateGlobalUniforms(const GlobalUniforms& uniforms);
   void OnSwapchainResized();
 
@@ -114,6 +118,7 @@ class RenderContext {
   // GPU Systems
   std::unique_ptr<GPUCulling> gpuCulling_;
   std::unique_ptr<BindlessMaterialManager> bindlessMaterials_;
+  std::unique_ptr<ForwardPlus> forwardPlus_;
 
   PipelineManager pipelineManager_;
 

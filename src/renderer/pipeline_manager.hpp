@@ -43,8 +43,9 @@ class PipelineManager {
 
   void Initialize(rhi::DescriptorSetLayout* globalLayout,
                   rhi::DescriptorSetLayout* materialLayout,
+                  rhi::DescriptorSetLayout* objectLayout,
                   rhi::DescriptorSetLayout* iblLayout,
-                  rhi::DescriptorSetLayout* objectLayout = nullptr);
+                  rhi::DescriptorSetLayout* lightLayout = nullptr);
 
   [[nodiscard]] rhi::Pipeline* GetPipeline(PipelineType type);
   [[nodiscard]] rhi::PipelineLayout* GetPipelineLayout() {
@@ -66,6 +67,7 @@ class PipelineManager {
   rhi::DescriptorSetLayout* materialLayout_{nullptr};
   rhi::DescriptorSetLayout* objectLayout_{nullptr};
   rhi::DescriptorSetLayout* iblLayout_{nullptr};
+  rhi::DescriptorSetLayout* lightLayout_{nullptr};
 };
 
 }  // namespace renderer

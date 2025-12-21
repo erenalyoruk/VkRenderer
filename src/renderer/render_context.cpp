@@ -25,15 +25,21 @@ RenderContext::RenderContext(rhi::Device& device, rhi::Factory& factory)
   skyboxIBL_ = std::make_unique<SkyboxIBL>(device_, factory_);
   skyboxIBL_->Initialize();
 
+  // Initialize Forward+ lighting
+  forwardPlus_ = std::make_unique<ForwardPlus>(factory_, device_);
+  forwardPlus_->Initialize();
+
   // Initialize pipeline manager with descriptor layouts:
   // set 0: global uniforms
   // set 1: bindless materials
   // set 2: object data SSBO
   // set 3: IBL (skybox, irradiance, prefiltered, BRDF LUT)
+  // set 4: Forward+ lighting
   pipelineManager_.Initialize(globalDescriptorLayout_.get(),
                               bindlessMaterials_->GetDescriptorLayout(),
+                              gpuCulling_->GetObjectDescriptorLayout(),
                               skyboxIBL_->GetIBLDescriptorLayout(),
-                              gpuCulling_->GetObjectDescriptorLayout());
+                              forwardPlus_->GetLightDescriptorLayout());
 
   CreateSyncObjects();
   CreateFrameResources();
@@ -112,6 +118,11 @@ void RenderContext::OnSwapchainResized() {
   device_.WaitIdle();
 
   CreateDepthBuffer();
+
+  // Update Forward+ screen size
+  auto* swapchain = device_.GetSwapchain();
+  forwardPlus_->UpdateScreenSize(swapchain->GetWidth(), swapchain->GetHeight());
+
   pipelineManager_.RecreatePipelines();
 
   uint32_t imageCount = device_.GetSwapchain()->GetImageCount();

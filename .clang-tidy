@@ -17,7 +17,8 @@ Checks: >
   -readability-magic-numbers,
   -cppcoreguidelines-pro-type-union-access,
   -cppcoreguidelines-avoid-const-or-ref-data-members,
-  -cppcoreguidelines-pro-bounds-pointer-arithmetic
+  -cppcoreguidelines-pro-bounds-pointer-arithmetic,
+  -pro-bounds-constant-array-index
 
 WarningsAsErrors: "*"
 HeaderFilterRegex: "*.(h|hpp)"

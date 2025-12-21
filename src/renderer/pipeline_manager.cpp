@@ -13,24 +13,31 @@ PipelineManager::PipelineManager(rhi::Factory& factory, rhi::Device& device)
 
 void PipelineManager::Initialize(rhi::DescriptorSetLayout* globalLayout,
                                  rhi::DescriptorSetLayout* materialLayout,
+                                 rhi::DescriptorSetLayout* objectLayout,
                                  rhi::DescriptorSetLayout* iblLayout,
-                                 rhi::DescriptorSetLayout* objectLayout) {
+                                 rhi::DescriptorSetLayout* lightLayout) {
   globalLayout_ = globalLayout;
   materialLayout_ = materialLayout;
-  iblLayout_ = iblLayout;
   objectLayout_ = objectLayout;
+  iblLayout_ = iblLayout;
+  lightLayout_ = lightLayout;
 
   // Create pipeline layout with all descriptor sets
   // Set 0: Global
   // Set 1: Materials
   // Set 2: Objects
   // Set 3: IBL
+  // Set 4: Forward+ Lights (optional)
   std::vector<rhi::DescriptorSetLayout*> layouts = {
       globalLayout_,    // set 0
       materialLayout_,  // set 1
       objectLayout_,    // set 2
       iblLayout_,       // set 3
   };
+
+  if (lightLayout_ != nullptr) {
+    layouts.push_back(lightLayout_);  // set 4
+  }
 
   std::array<rhi::PushConstantRange, 1> pushConstants = {{
       {.stage = rhi::ShaderStage::Vertex, .offset = 0, .size = 128},
@@ -155,7 +162,8 @@ rhi::Pipeline* PipelineManager::GetPipeline(PipelineType type) {
 
 void PipelineManager::RecreatePipelines() {
   pipelines_.clear();
-  Initialize(globalLayout_, materialLayout_, iblLayout_, objectLayout_);
+  Initialize(globalLayout_, materialLayout_, objectLayout_, iblLayout_,
+             lightLayout_);
 }
 
 }  // namespace renderer
